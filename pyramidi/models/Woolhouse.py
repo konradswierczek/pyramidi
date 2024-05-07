@@ -1,3 +1,5 @@
+
+from itertools import combinations
 __all__ = ['event_attraction', 'chroma_attraction',
            'key_attraction', 'diatonicity']
 # Diatonic Sets, represented by pitch class root (0 = C) and mode (ma = major).

@@ -3,7 +3,8 @@
 ###############################################################################
 # Local Imports
 # Third Party Imports
-from mido import MidiFile
+from mido import MidiFile, tempo2bpm, MidiTrack
+from itertools import combinations
 ###############################################################################
 # Constants
 __all__ = []
@@ -126,17 +127,17 @@ def swierckj_pcd(midiFile, timebase = "seconds", velocity = "False"):
     """
     """
     # TODO: Add vleocity weightings
-    midiFile = mido.MidiFile(midiFile)
+    midiFile = MidiFile(midiFile)
     tpb = midiFile.ticks_per_beat
     if "set_tempo" in [msg.type for msg in midiFile.tracks[0]]:
-        bpm = mido.tempo2bpm([msg.tempo for msg in midiFile.tracks[0] if 
+        bpm = tempo2bpm([msg.tempo for msg in midiFile.tracks[0] if 
                             msg.type == "set_tempo"][0])
     else:
         bpm = 120
     if timebase == "seconds":
         temp = 0
-        new = mido.MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
-        track = mido.MidiTrack()
+        new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
+        track = MidiTrack()
         new.tracks.append(track)
         for i in range(len(midiFile.tracks)):
                 for msg in midiFile.tracks[i]:
@@ -146,8 +147,8 @@ def swierckj_pcd(midiFile, timebase = "seconds", velocity = "False"):
                     temp = abs_time
     elif timebase == "ticks":
         temp = 0
-        new = mido.MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
-        track = mido.MidiTrack()
+        new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
+        track = MidiTrack()
         new.tracks.append(track)
         for i in range(len(midiFile.tracks)):
                 for msg in midiFile.tracks[i]:
@@ -281,25 +282,25 @@ class ChordDetect:
                                                      """
                         else: self.chord_symbol = f"{self.root_note}{self.quality}"
 
-def chordsymbol_analysis(filepath, none = True):
-        """ Def.
-            filepath = 
-            none = True/False include no chord entries
-        """
-        chords = [[pitch.midi for pitch in chord.pitches] 
-                   for chord in (music21.converter.parse(filepath)).chordify().
-                   recurse().getElementsByClass('Chord')
-                 ]
-        chord_symbols = [ChordDetect(chord).chord_symbol for chord in chords]
-        if none == True:
-                return chord_symbols
-        elif none == False:
-                try:
-                        while True:
-                                chord_symbols.remove(None)
-                except ValueError:
-                        pass
-                return chord_symbols
+#def chordsymbol_analysis(filepath, none = True):
+#        """ Def.
+#            filepath = 
+#            none = True/False include no chord entries
+#        """
+#        chords = [[pitch.midi for pitch in chord.pitches] 
+#                   for chord in (music21.converter.parse(filepath)).chordify().
+#                   recurse().getElementsByClass('Chord')
+#                 ]
+#        chord_symbols = [ChordDetect(chord).chord_symbol for chord in chords]
+#        if none == True:
+#                return chord_symbols
+#        elif none == False:
+#                try:
+#                        while True:
+#                                chord_symbols.remove(None)
+#                except ValueError:
+#                        pass
+#                return chord_symbols
 
 # TODO:
 # Chord Inversions Gen?

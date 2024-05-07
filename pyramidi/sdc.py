@@ -3,10 +3,9 @@
 ###############################################################################
 # Local Imports
 from pyramidi.analysis import salami
-from pyramidi.core import pre_process, cut
+from pyramidi.core import pre_process, cut, midi_2_key, get_tempo
 # Third Party Imports
-from mido import MidiFile, MidiTrack, MetaMessage, Message, second2tick
-from pandas import DataFrame, concat
+from mido import MidiFile, second2tick
 ###############################################################################
 # Constants
 __all__ = []
@@ -42,7 +41,7 @@ def pitch_height(midiFile, direct: bool = False):
 ###############################################################################
 def beat_density(midi_file: str = 'tests/test.mid'):
     midi = midi_file
-    ticks = int(mido.second2tick(midi.length, midi.ticks_per_beat, get_tempo(midi)))
+    ticks = int(second2tick(midi.length, midi.ticks_per_beat, get_tempo(midi)))
     beats = int(ticks / midi.ticks_per_beat)
     slices = salami(midi)
     return len(slices) / beats
@@ -76,11 +75,11 @@ def get_onset_rate(file, time_unit: str = "beat"):
     return onset_rate(cut(pre_process(file), direct = True), time_unit = time_unit, direct = True)
 
 ###############################################################################
-def ambitus():
+#def ambitus():
 
 ###############################################################################
-def cardinality():
+#def cardinality():
 
 ###############################################################################
 
-def 
+#def 
