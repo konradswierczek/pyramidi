@@ -306,7 +306,7 @@ def keyfinding(
     """
     """
     if not isinstance(pitchDistribution, list):
-        raise TypeError(\
+        raise TypeError(
             "must be pitch distribution."
         )
     if profile not in PROFILES.keys():
@@ -314,7 +314,9 @@ def keyfinding(
             "Invalid profile name"
         )
     if similarity not in SIMILARITY_METRICS.keys():
-        raise TypeError("Invalid similarity metric.")
+        raise TypeError(
+            "Invalid similarity metric."
+        )
     similarity_function = SIMILARITY_METRICS[similarity]
     coefis = {}
     for key in PROFILES[profile]:

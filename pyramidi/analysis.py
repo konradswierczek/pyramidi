@@ -185,16 +185,23 @@ def ambitus(file):
     return min(number_list), max(number_list)
 
 ###############################################################################
-
 def unique_pc(chord):
-        """ Returns tuple of unique pitch classes in a chord.
-            chord = list of MIDI or pitch class numbers representing a chord
         """
-        return set([note%12 for note in chord])
-
+        Returns tuple of unique pitch classes in a chord.
+                Arguments: 
+                        chord (list): MIDI or pitch class numbers
+        
+        """
+        if not isinstance(chord, list):
+                raise TypeError(
+                        "Must be list of MIDI or pitch class numbers."
+                )
+        return set([note % 12 for note in chord])
+###############################################################################
 def bass_intervals(chord):
-        """ Returns tuple of semitone distances between lowest note in a chord
-            and every other note in the chord. 
+        """
+        Returns tuple of semitone distances between lowest note in a chord
+        and every other note in the chord. 
             chord = list of MIDI or pitch class numbers representing a chord
         """
         int = [abs(chord[0]-chord[note])%12 for note in range(1,len(chord))]

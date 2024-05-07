@@ -1,22 +1,27 @@
 
 from itertools import combinations
-__all__ = ['event_attraction', 'chroma_attraction',
-           'key_attraction', 'diatonicity']
+__all__ = [
+    'event_attraction',
+    'chroma_attraction',
+    'key_attraction',
+    'diatonicity'
+]
 # Diatonic Sets, represented by pitch class root (0 = C) and mode (ma = major).
 # Values are represented in pitch classes.
 DIATONIC_SETS = {
-       '0ma': [0,2,4,5,7,9,11],
-       '1ma': [1,3,5,6,8,10,0],
-       '2ma': [2,4,6,7,9,11,1],
-       '3ma': [3,5,7,8,10,0,2],
-       '4ma': [4,6,8,9,11,1,3],
-       '5ma': [5,7,9,10,0,2,4],
-       '6ma': [6,8,10,11,1,3,5],
-       '7ma': [7,9,11,0,2,4,6],
-       '8ma': [8,10,0,1,3,5,7],
-       '9ma': [9,11,1,2,4,6,8],
-       '10ma': [10,0,2,3,5,7,9],
-       '11ma': [11,1,3,4,6,8,10]}
+    '0ma': [0,2,4,5,7,9,11],
+    '1ma': [1,3,5,6,8,10,0],
+    '2ma': [2,4,6,7,9,11,1],
+    '3ma': [3,5,7,8,10,0,2],
+    '4ma': [4,6,8,9,11,1,3],
+    '5ma': [5,7,9,10,0,2,4],
+    '6ma': [6,8,10,11,1,3,5],
+    '7ma': [7,9,11,0,2,4,6],
+    '8ma': [8,10,0,1,3,5,7],
+    '9ma': [9,11,1,2,4,6,8],
+    '10ma': [10,0,2,3,5,7,9],
+    '11ma': [11,1,3,4,6,8,10]
+}
 SCALES = {
     'ka0ma': [0,2,4,5,7,9,11],
     'ka1ma': [1,3,5,6,8,10,0],
@@ -29,11 +34,23 @@ SCALES = {
     'ka8ma': [8,10,0,1,3,5,7],
     'ka9ma': [9,11,1,2,4,6,8],
     'ka10ma': [10,0,2,3,5,7,9],
-    'ka11ma': [11,1,3,4,6,8,10]}
+    'ka11ma': [11,1,3,4,6,8,10]
+}
+ALLPC = list(range(
+    0,
+    12
+))
 ###############################################################################
-def event_attraction(pre_chord, suc_chord, 
-                     alpha = 99999, beta = 4, Gamma = 8, delta = 0.1):
-    """ Pairwise Tonal Attraction after Woolhouse 2009.
+def event_attraction(
+    pre_chord,
+    suc_chord, 
+    alpha = 99999,
+    beta = 4,
+    Gamma = 8,
+    delta = 0.1
+):
+    """
+    Pairwise Tonal Attraction after Woolhouse 2009.
         pre_chord = preceding chord.
         succ chord = succeding chord.
         alpha = Voice Leading weighting variable.
@@ -56,7 +73,10 @@ def event_attraction(pre_chord, suc_chord,
         else:
             return "C" 
 ###########################################################################
-    def pd(midi1,midi2):
+    def pd(
+        midi1,
+        midi2
+    ):
         """ Calculate semitone distance between two midi numbers. """
         return abs(midi1 - midi2)
 ###########################################################################
@@ -112,47 +132,49 @@ def event_attraction(pre_chord, suc_chord,
     return ea
 
 ###############################################################################
-def chroma_attraction(chord, alpha = 9999999, beta = 4):
-    """"""
-    ca = [(round(event_attraction(chord, pc, alpha = alpha, beta = beta, Gamma = 1, delta = 0),3)) for pc in ALLPC]
+def chroma_attraction(
+    chord,
+    alpha = 9999999,
+    beta = 4
+):
+    """
+    """
+    ca = [(round(event_attraction(
+                chord,
+                pc,
+                alpha = alpha,
+                beta = beta,
+                Gamma = 1,
+                delta = 0),
+            3)) for pc in ALLPC]
     return ca
 
+###############################################################################
 def key_attraction(chord):
-    """"""
+    """
+    """
     ca = chroma_attraction(chord)
     ka = {}
     for name, scale in SCALES.items():
         ka_list = []
         for pc in SCALES[name]:
             ka_list.append(ca[pc])
-            ka[name] = sum(ka_list)/len(ka_list)
+            ka[name] = sum(ka_list)/ len(ka_list)
     return ka
 
 ###############################################################################
-def key_attraction(chord):
-    """"""
-    ca = chroma_attraction(chord)
-    ka = {}
-    for name, scale in SCALES.items():
-        ka_list = []
-        for pc in SCALES[name]:
-            ka_list.append(ca[pc])
-            ka[name] = sum(ka_list)/len(ka_list)
-    return ka
-###############################################################################
-def chroma_attraction(chord, alpha = 9999999, beta = 4):
-        ca = [(round(event_attraction(chord, pc, alpha = alpha, beta = beta, Gamma = 1, delta = 0),3)) for pc in ALLPC]
-        return ca
-
-###############################################################################
-def diatonicity(chord, epsilon = 1):
-    """This function identifies the diatonic relation 
+def diatonicity(
+    chord,
+    epsilon = 1
+):
+    """
+    This function identifies the diatonic relation 
     of inputted chords to DIATONIC_SETS
     chord = midi
         epsilon = 
     """
     cardinality = len(chord)
-    unique_pc = list(set([note%12 for note in chord]))
+    unique_pc = list(set([note % 12 for note in chord]))
     counts = [(len(set(unique_pc).intersection(DIATONIC_SETS[scale]))) \
               for scale in DIATONIC_SETS]
     diatonic_weight = [round((scale_count + epsilon) / (7 + epsilon) * 
