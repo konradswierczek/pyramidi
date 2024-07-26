@@ -10,9 +10,11 @@ __all__ = ['manipulate_midi']
 class ManipulateMIDI:
     """
     """
-    def __init__(self,
-                 midi_file: str,
-                 output_file: str = "output.mid"):
+    def __init__(
+        self,
+        midi_file: str,
+        output_file: str = "output.mid"
+    ):
         """
         """
         self.midi_file = midi_file
@@ -25,23 +27,31 @@ class ManipulateMIDI:
         """
         return self.midi_file
     ###########################################################################
-    def manipulate(self,
-                   tempo = 1,
-                   semitones: int = 0,
-                   min_pitch: int = 0,
-                   max_pitch: int = 127,
-                   velocity: int = 64,
-                   articulation: float = 1):
+    def manipulate(
+        self,
+        tempo = 1,
+        semitones: int = 0,
+        min_pitch: int = 0,
+        max_pitch: int = 127,
+        velocity: int = 64,
+        articulation: float = 1
+    ):
         """
         """
-        self.manipulated_midi = change_tempo(self.midi,
-                                             tempo = tempo)
-        self.manipulated_midi = change_pitchHeight(self.manipulated_midi,
-                                                   semitones = semitones,
-                                                   min = min_pitch,
-                                                   max = max_pitch)
-        self.manipulated_midi = change_velocity(self.manipulated_midi,
-                                                velocity = velocity)
+        self.manipulated_midi = change_tempo(
+            self.midi,
+            tempo = tempo
+        )
+        self.manipulated_midi = change_pitchHeight(
+            self.manipulated_midi,
+            semitones = semitones,
+            min = min_pitch,
+            max = max_pitch
+        )
+        self.manipulated_midi = change_velocity(
+            self.manipulated_midi,
+            velocity = velocity
+        )
         # TODO: make change_articulation work
         #self.manipulated_midi = change_articulation(self.manipulated_mid,
         #                                           articulation = articulation)

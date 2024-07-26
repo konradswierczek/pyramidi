@@ -38,3 +38,4 @@ CHANGE_TRACKER
 .Rhistory
 
 temp
+*.code-workspace

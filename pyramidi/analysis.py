@@ -211,6 +211,7 @@ def bass_intervals(chord):
         else: 
                 return tuple(int)
 
+###############################################################################
 def interval_vector(chord):
         """ Returns Interval Vector of a chord after Forte 1973.
             chord = list of MIDI or pitch class numbers representing a chord
@@ -226,6 +227,7 @@ def interval_vector(chord):
                 intervalvector[interval-1] = intervalvector[interval-1] + 1
         return intervalvector
 
+###############################################################################
 def chord_quality(chord):
         """ Returns chord quality for chord symbols. See 'CHORD_IVS' for list. 
             chord = list of MIDI or pitch class numbers representing a chord
@@ -239,6 +241,7 @@ def chord_quality(chord):
         except KeyError:
                 return None
 
+###############################################################################
 class ChordDetect:
     def __init__ (self, chord, key = 'Cmaj'):
         """ Returns chord symbol information for chord
@@ -314,12 +317,6 @@ class ChordDetect:
 # Add chords automatically
 # Bass intervals bad?
 ###############################################################################
-def unique_pc(chord):
-        """ Returns tuple of unique pitch classes in a chord.
-            chord = list of MIDI or pitch class numbers representing a chord
-        """
-        return set([note%12 for note in chord])
-
 # Generate sets for all major triads
 def triad_quality(chord):
     """
