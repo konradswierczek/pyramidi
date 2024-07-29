@@ -5,7 +5,7 @@
 from mido import MidiFile, MidiTrack
 ###############################################################################
 # Constants
-__all__ = ['manipulate_midi']
+__all__ = ['ManipulateMIDI']
 ###############################################################################
 class ManipulateMIDI:
     """
@@ -13,13 +13,17 @@ class ManipulateMIDI:
     def __init__(
         self,
         midi_file: str,
-        output_file: str = "output.mid"
+        output_file: str = "output.mid",
+        file = True
     ):
         """
         """
         self.midi_file = midi_file
         self.output_file = output_file
-        self.midi = MidiFile(midi_file)
+        if file == True:
+            self.midi = MidiFile(midi_file)
+        else:
+            self.midi = midi_file
         self.manipulated_midi = None
     ###########################################################################
     def __str__(self):
