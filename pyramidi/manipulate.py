@@ -2,7 +2,7 @@
 """
 ###############################################################################
 # Third-Party Imports
-from mido import MidiFile, MidiTrack
+from mido import MidiFile, MidiTrack, bpm2tempo
 ###############################################################################
 # Constants
 __all__ = ['ManipulateMIDI']
@@ -33,7 +33,7 @@ class ManipulateMIDI:
     ###########################################################################
     def manipulate(
         self,
-        tempo = 1,
+        tempo: float = 120,
         semitones: int = 0,
         min_pitch: int = 0,
         max_pitch: int = 127,
@@ -42,9 +42,9 @@ class ManipulateMIDI:
     ):
         """
         """
-        self.manipulated_midi = change_tempo(
+        self.manipulated_midi = change_bpm(
             self.midi,
-            tempo = tempo
+            bpm = tempo
         )
         self.manipulated_midi = change_pitchHeight(
             self.manipulated_midi,
@@ -66,7 +66,7 @@ class ManipulateMIDI:
         self.manipulated_midi.save(self.output_file)
     ###########################################################################
     def qwik(self,
-             tempo = 1,
+             tempo: float = 120,
              semitones: int = 0,
              min_pitch: int = 0,
              max_pitch: int = 127,
@@ -154,6 +154,22 @@ def change_tempo(midiFile: str, tempo: float = 2.0):
             if msg.type == "set_tempo":
                 newTempo = int(msg.tempo * (1/tempo))
                 track.append(msg.copy(tempo = (newTempo)))
+            else:
+                track.append(msg)
+    return new
+
+###############################################################################\
+def change_bpm(midiFile: str, bpm = float):
+    """
+    """
+    new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
+    track = MidiTrack()
+    new.tracks.append(track)
+    tempo = bpm2tempo(bpm)
+    for i in range(len(midiFile.tracks)):
+        for msg in midiFile.tracks[i]:
+            if msg.type == "set_tempo":
+                track.append(msg.copy(tempo = (tempo)))
             else:
                 track.append(msg)
     return new
