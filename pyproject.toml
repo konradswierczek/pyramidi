@@ -1,16 +1,18 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyramidi"
-version = "0.0.2"
+version = "1.0.0"
 authors = [
   { name="Konrad Swierczek", email="swierckj@mcmaster.ca" },
 ]
 description = "A package for processing, manipulating, and analyzing MIDI files using Mido."
 readme = "README.md"
 requires-python = ">=3.10.12"
+
+
 dependencies = [
   "pandas > 2.0.0",
   "scipy > 1.10.1",
@@ -22,6 +24,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.scripts]
+manipulateMIDI = "pyramidi.cli.manipulateMIDI:main"
 
 [project.urls]
 Homepage = "https://github.com/konradswierczek/pyramidi"
