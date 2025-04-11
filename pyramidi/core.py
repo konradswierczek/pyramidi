@@ -3,113 +3,48 @@
 ###############################################################################
 # Local Imports
 # Third Party Imports
-from mido import (
-    MidiFile, MidiTrack, tempo2bpm
-)
+from mido import MidiFile, MidiTrack, MetaMessage, Message, tempo2bpm, merge_tracks
 ###############################################################################
 # Constants
 __all__ = ['pre_process', "cut"]
-# =========================================================================== #
-def get_timeSignature(mid):
+###############################################################################
+def pre_process(
+    midi_file,
+    savepath: str = None
+):
     """
-    Look for the first time_signature meta event in any track.
-    If more than one distinct time signature is found, print a warning and return the first.
-    If none is found, default to 4/4.
-    """
-    found = []
-    for track in mid.tracks:
-        for msg in track:
-            if msg.type == 'time_signature':
-                ts = (msg.numerator, msg.denominator)
-                if ts not in found:
-                    found.append(ts)
-    if found:
-        if len(found) > 1:
-            print(f"\033[31mWarning: Multiple distinct time signatures found. Using the first one: \033[35m{found[0]}\033[0m")
-        return found[0]
-    return (4, 4)
+    Reformat and preprocess a MIDI file for analysis.
+    Returns a Type 0 Mido MidiFile class object.
 
-# =========================================================================== #
-def get_measureLength(mid, time_signature):
+    Keyword arguments:
+    midiFile -- Any '.mid' file with relative path. 
+    savepath -- Filepath for a file version of output.
     """
-    Given a mido MidiFile and a time signature (numerator, denominator),
-    compute the number of ticks in one full measure.
-    
-    Formula:
-       measure_ticks = ticks_per_beat * numerator * (4 / denominator)
-    """
-    numerator, denominator = time_signature
-    ticks_per_beat = mid.ticks_per_beat
-    measure_ticks = ticks_per_beat * numerator * (4 / denominator)
-    return int(measure_ticks)
+    # TODO: Add savepath functionality
+    ###########################################################################
+    # Read midi file with Mido.
+    midi_data = MidiFile(midi_file)
+    # Create new Type 0 Mido MidiFile class object, add input 'ticks_per_beat'.
+    new_midi = MidiFile(
+        type = 0,
+        ticks_per_beat = midi_data.ticks_per_beat
+    )
+    new_midi.tracks.append(merge_tracks(midi_data.tracks))
+    # Return entire Mido MidiFile class object.
+    return new_midi
 
-# =========================================================================== #
-def get_totalTicks(mid):
-    """
-    Given a mido.MidiFile object, compute the total absolute time in ticks.
-    This function calculates the cumulative time for each track (by summing 
-    delta times) and returns the maximum value encountered, which represents 
-    the total duration of the file.
-    
-    Parameters:
-        mid (mido.MidiFile): The MIDI file loaded using mido.
+###############################################################################
+def lenBar(time_signature: tuple):
+    """Given a time signature, returns the number of quarter notes per bar."""
+    quarter_notes = (time_signature[0]/time_signature[1]) * 4
+    return quarter_notes
 
-    Returns:
-        int: The total absolute time in ticks.
-    """
-    total_time = 0
-    for track in mid.tracks:
-        abs_time = 0
-        for msg in track:
-            abs_time += msg.time
-        total_time = max(total_time, abs_time)
-    return total_time
-
-# =========================================================================== #
-def cut_midi(mid, length_in_ticks):
-    """
-    Cuts a MidiFile to a specified length (in ticks).
-    
-    Parameters:
-        mid (mido.MidiFile): The original MIDI file.
-        length_in_ticks (int): The desired length of the new MIDI file in ticks.
-        
-    Returns:
-        mido.MidiFile: The cut MIDI file.
-    """
-    # Merge all tracks into one list of events with absolute time.
-    events = []
-    for track in mid.tracks:
-        abs_time = 0
-        for msg in track:
-            abs_time += msg.time
-            events.append((abs_time, msg))
-    
-    # Filter events that happen before the given length in ticks.
-    events_to_keep = [
-        (abs_time, msg) for abs_time, msg in events if abs_time < length_in_ticks
-    ]
-    
-    # Rebuild a single track from the filtered events
-    new_track = MidiTrack()
-    last_time = 0
-    for abs_time, msg in sorted(events_to_keep, key = lambda x: x[0]):
-        delta = abs_time - last_time
-        new_msg = msg.copy(time = delta)
-        new_track.append(new_msg)
-        last_time = abs_time
-    
-    # Create a new MidiFile object and add the new track
-    new_mid = MidiFile(ticks_per_beat = mid.ticks_per_beat)
-    new_mid.tracks.append(new_track)
-    
-    return new_mid
-
-# =========================================================================== #
-def midi2keyboard(midi_number: int):
+###############################################################################
+def midi_2_key(midiNumber: int):
     """ Returns piano key number given a MIDI number.
     """
-    return midi_number - 20
+    # Subtract 20 from midiNumber.
+    return midiNumber - 20
 
 ###############################################################################
 def get_tempo(midi_file):
@@ -119,3 +54,49 @@ def get_tempo(midi_file):
     return tempo[0]
 
 ###############################################################################
+def get_timesig(midi_file):
+    time_sig = [(msg.numerator, msg.denominator) for msg in midi_file if msg.type == "time_signature"]
+    return time_sig[0]
+
+# =========================================================================== #
+def cut(midi_data, measures = 8):
+    # variables
+    tpb = midi_data.ticks_per_beat
+    ticks = int()
+    target_ticks = int(
+        [lenBar(
+            (msg.numerator,
+             msg.denominator
+            )
+        ) * measures * tpb for msg in midi_data.tracks[0] if msg.type == "time_signature"
+        ][0])
+    active_notes = dict()
+    # New midi data
+    new = MidiFile(type=0, ticks_per_beat=tpb)
+    track = MidiTrack()
+    new.tracks.append(track)
+    for msg in midi_data.tracks[0]:
+        if isinstance(msg, MetaMessage):
+            if msg.type == "time_signature":
+                time_signature = (msg.numerator, msg.denominator)
+                target_ticks = lenBar(time_signature) * measures * tpb
+        elif isinstance(msg, Message):
+            if msg.type == "note_on" and msg.velocity > 0:
+                active_notes[msg.note] = msg.velocity
+            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
+                active_notes.pop(msg.note, None)
+        ticks += msg.time
+        # write
+        if ticks > target_ticks:
+            break
+        elif ticks == target_ticks and  msg.type == "note_on" and msg.velocity > 0:
+            break
+        else:
+            track.append(msg)
+    # Clean up
+    for leftover in active_notes:
+        track.append(Message(type = "note_off", note = leftover, velocity = active_notes[leftover], time = 0))
+    track.append(MetaMessage(type = 'end_of_track', time = 1))
+    return new
+
+# =========================================================================== #
