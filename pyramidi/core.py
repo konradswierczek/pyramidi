@@ -6,9 +6,7 @@
 from mido import (
     MidiFile, MidiTrack, tempo2bpm
 )
-###############################################################################
-# Constants
-__all__ = ['pre_process', "cut"]
+
 # =========================================================================== #
 def get_timeSignature(mid):
     """
