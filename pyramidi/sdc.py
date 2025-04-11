@@ -3,42 +3,35 @@
 ###############################################################################
 # Local Imports
 from pyramidi.analysis import salami
-from pyramidi.core import pre_process, cut, midi_2_key, get_tempo
+from pyramidi.core import midi2keyboard
 # Third Party Imports
-from mido import MidiFile, second2tick
+from mido import second2tick
 ###############################################################################
-# Constants
-__all__ = []
-###############################################################################
-def pitch_height(midiFile, direct: bool = False):
+def get_pitchHeight(midi):
     """
     """
-    # Option to use preloaded Mido MidiFile class object.
-    if direct == False:
-        midiFile = MidiFile(midiFile)
-    else:
-        pass
     # Create lists to store pitch and timing information.
     pitch = []
     weight = []
-    for t in range(len(midiFile.tracks)):
+    for t in range(len(midi.tracks)):
         # Loop across all messages, including an index number.
-        for i, msg in enumerate(midiFile.tracks[t]):
+        for i, msg in enumerate(midi.tracks[t]):
             # Find "note_off" to go with a given "note_on".
             if msg.type == "note_on":
                 # For each new message, restart the next message overall timing counter.
                 next_abs_time = 0
-                for next in range(i + 1, len(midiFile.tracks[t])):
-                    next_msg = midiFile.tracks[t][next]
+                for next in range(i + 1, len(midi.tracks[t])):
+                    next_msg = midi.tracks[t][next]
                     next_abs_time = next_abs_time + next_msg.time
                     if next_msg.type == "note_off" and \
                     next_msg.note == msg.note: 
-                        pitch.append(midi_2_key(msg.note))
-                        weight.append(next_abs_time/midiFile.ticks_per_beat)
+                        pitch.append(midi2keyboard(msg.note))
+                        weight.append(next_abs_time / midi.ticks_per_beat)
                         break
-    return sum([p * w for (p, w) in zip(pitch, weight)])/sum(weight)
+    return sum([p * w for (p, w) in zip(pitch, weight)]) / sum(weight)
 
 ###############################################################################
+# NOT TESTED IN BETA
 def beat_density(midi_file: str = 'tests/test.mid'):
     midi = midi_file
     ticks = int(second2tick(midi.length, midi.ticks_per_beat, get_tempo(midi)))
@@ -47,6 +40,7 @@ def beat_density(midi_file: str = 'tests/test.mid'):
     return len(slices) / beats
 
 ###############################################################################
+# NOT TESTED IN BETA
 def onset_rate(midiFile, time_unit: str = "beat", direct: bool = False):
     """
     """
@@ -67,19 +61,3 @@ def onset_rate(midiFile, time_unit: str = "beat", direct: bool = False):
     return onsets / time_unit
 
 ###############################################################################
-def get_pitch_height(file):
-    return pitch_height(cut(pre_process(file), direct = True), direct = True)
-
-###############################################################################
-def get_onset_rate(file, time_unit: str = "beat"):
-    return onset_rate(cut(pre_process(file), direct = True), time_unit = time_unit, direct = True)
-
-###############################################################################
-#def ambitus():
-
-###############################################################################
-#def cardinality():
-
-###############################################################################
-
-#def 

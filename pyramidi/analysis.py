@@ -8,10 +8,10 @@ from itertools import combinations
 ###############################################################################
 # Constants
 __all__ = []
-maj = tuple([{(pitch + pc)%12 for pitch in [0,4,7]} for pc in range (0,12)])
-min = tuple([{(pitch + pc)%12 for pitch in [0,3,7]} for pc in range (0,12)])
-aug = tuple([{(pitch + pc)%12 for pitch in [0,4,8]} for pc in range (0,12)])
-dim = tuple([{(pitch + pc)%12 for pitch in [0,3,6]} for pc in range (0,12)])
+#maj = tuple([{(pitch + pc)%12 for pitch in [0,4,7]} for pc in range (0,12)])
+#min = tuple([{(pitch + pc)%12 for pitch in [0,3,7]} for pc in range (0,12)])
+#aug = tuple([{(pitch + pc)%12 for pitch in [0,4,8]} for pc in range (0,12)])
+#dim = tuple([{(pitch + pc)%12 for pitch in [0,3,6]} for pc in range (0,12)])
 # Interval Vectors of various chord identities. 
 CHORD_IVS = {
                 # Triads
@@ -123,6 +123,7 @@ NOTE_KEYS = {'Cmaj':{0:'C',1:'C#',2:'D',3:'D#',4:'E',5:'F',6:'F#',
 
 ALLIC = list(range(0,12))
 ###############################################################################
+# NOT TESTED IN BETA
 def swierckj_pcd(midiFile, timebase = "seconds", velocity = "False"):
     """
     """
@@ -174,17 +175,18 @@ def swierckj_pcd(midiFile, timebase = "seconds", velocity = "False"):
     return {pc: pcd[pc]/sum(pcd.values()) for pc in range(0,12)}
 
 ###############################################################################
-def ambitus(file):
+def get_ambitus(midi):
     """
     """
     number_list = []
-    for track in MidiFile(file).tracks:
+    for track in midi.tracks:
         for msg in track:
             if msg.type == "note_on":
                 number_list.append(msg.note)
     return min(number_list), max(number_list)
 
 ###############################################################################
+# NOT TESTED IN BETA
 def unique_pc(chord):
         """
         Returns tuple of unique pitch classes in a chord.
@@ -198,6 +200,7 @@ def unique_pc(chord):
                 )
         return set([note % 12 for note in chord])
 ###############################################################################
+# NOT TESTED IN BETA
 def bass_intervals(chord):
         """
         Returns tuple of semitone distances between lowest note in a chord
@@ -212,6 +215,7 @@ def bass_intervals(chord):
                 return tuple(int)
 
 ###############################################################################
+# NOT TESTED IN BETA
 def interval_vector(chord):
         """ Returns Interval Vector of a chord after Forte 1973.
             chord = list of MIDI or pitch class numbers representing a chord
@@ -228,6 +232,7 @@ def interval_vector(chord):
         return intervalvector
 
 ###############################################################################
+# NOT TESTED IN BETA
 def chord_quality(chord):
         """ Returns chord quality for chord symbols. See 'CHORD_IVS' for list. 
             chord = list of MIDI or pitch class numbers representing a chord
@@ -242,6 +247,7 @@ def chord_quality(chord):
                 return None
 
 ###############################################################################
+# NOT TESTED IN BETA
 class ChordDetect:
     def __init__ (self, chord, key = 'Cmaj'):
         """ Returns chord symbol information for chord
@@ -317,6 +323,7 @@ class ChordDetect:
 # Add chords automatically
 # Bass intervals bad?
 ###############################################################################
+# NOT TESTED IN BETA
 # Generate sets for all major triads
 def triad_quality(chord):
     """
@@ -338,6 +345,7 @@ test_dict = {
             }
 """
 ###############################################################################
+# NOT TESTED IN BETA
 def salami(midi_file, direct: bool = False):
     """
     """
