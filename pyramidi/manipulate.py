@@ -2,7 +2,7 @@
 """
 ###############################################################################
 # Third-Party Imports
-from mido import MidiFile, MidiTrack, bpm2tempo
+from mido import MidiFile, MidiTrack
 ###############################################################################
 # Constants
 __all__ = ['ManipulateMIDI']
@@ -212,7 +212,7 @@ def change_tempo(midiFile: MidiFile, tempo: int = 500000):
 
     return new
 
-###############################################################################\
+###############################################################################
 # DEV
 def change_articulation(midiFile: str, duration: float = 1):
     """
