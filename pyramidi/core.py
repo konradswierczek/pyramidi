@@ -5,7 +5,7 @@
 from warnings import warn
 # Third Party Imports
 from mido import (
-    MidiFile, MidiTrack, tempo2bpm, merge_tracks
+    MidiFile, MidiTrack, tempo2bpm, merge_tracks, MetaMessage, Message
 )
 
 # =========================================================================== #
@@ -218,43 +218,71 @@ def filter_msgs(mid: MidiFile, types_to_filter):
     return filtered
 
 # =========================================================================== #
-def cut_midi(mid, length_in_ticks):
+def cut_midi(mid: MidiFile, cut_tick: int) -> MidiFile:
     """
-    Cuts a MidiFile to a specified length (in ticks).
-    
-    Parameters:
-        mid (mido.MidiFile): The original MIDI file.
-        length_in_ticks (int): The desired length of the new MIDI file in ticks.
-        
-    Returns:
-        mido.MidiFile: The cut MIDI file.
+    Return a new MidiFile (Type 0) containing only events up to `cut_tick`.
     """
-    # Merge all tracks into one list of events with absolute time.
-    events = []
-    for track in mid.tracks:
-        abs_time = 0
-        for msg in track:
-            abs_time += msg.time
-            events.append((abs_time, msg))
-    
-    # Filter events that happen before the given length in ticks.
-    events_to_keep = [
-        (abs_time, msg) for abs_time, msg in events if abs_time < length_in_ticks
-    ]
-    
-    # Rebuild a single track from the filtered events
-    new_track = MidiTrack()
-    last_time = 0
-    for abs_time, msg in sorted(events_to_keep, key = lambda x: x[0]):
-        delta = abs_time - last_time
-        new_msg = msg.copy(time = delta)
-        new_track.append(new_msg)
-        last_time = abs_time
-    
-    # Create a new MidiFile object and add the new track
-    new_mid = MidiFile(ticks_per_beat = mid.ticks_per_beat)
-    new_mid.tracks.append(new_track)
-    
+    # make an empty MIDI with same timing
+    new_mid = MidiFile(type=0)
+    new_mid.ticks_per_beat = mid.ticks_per_beat
+
+    track = MidiTrack()
+    new_mid.tracks.append(track)
+
+    cum_tick = 0
+    # keep track of which notes are currently on, so we can turn them off
+    active_notes = {}
+
+    for msg in mid.tracks[0]:
+        # if we've already reached or passed the cut, skip everything
+        if cum_tick >= cut_tick:
+            break
+
+        # if this message would go past the cut:
+        if cum_tick + msg.time > cut_tick:
+            # include a truncated delta
+            delta = cut_tick - cum_tick
+            # insert a “dummy” message with just the delta (no real event)
+            # OR attach that delta to the next meta/end_of_track
+            if not msg.is_meta and msg.type.startswith('note_'):
+                # we won’t include the original msg, just advance time
+                track.append(Message('note_off', note=0, velocity=0, time=delta))
+            else:
+                # for meta (including tempo), we skip the event but absorb the time
+                track.append(MetaMessage('end_of_track', time=delta))
+            cum_tick = cut_tick
+            break
+
+        # otherwise, copy the message in full
+        # but watch for note_on/off to track active notes
+        copy = msg.copy()
+        track.append(copy)
+        cum_tick += msg.time
+
+        # track active notes so we can shut them all off at the end
+        if not msg.is_meta and msg.type == 'note_on' and msg.velocity > 0:
+            active_notes.setdefault((msg.channel, msg.note), 0)
+            active_notes[(msg.channel, msg.note)] += 1
+        elif not msg.is_meta and (
+              (msg.type == 'note_off') or
+              (msg.type == 'note_on' and msg.velocity == 0)
+            ):
+            key = (msg.channel, msg.note)
+            if key in active_notes:
+                active_notes[key] -= 1
+                if active_notes[key] <= 0:
+                    del active_notes[key]
+
+    # at cut point, make sure any still-on notes get turned off immediately
+    if active_notes:
+        for (chan, note), count in list(active_notes.items()):
+            # velocity 0 note_on is equivalent to note_off
+            track.append(Message('note_on', note=note, velocity=0,
+                                 channel=chan, time=0))
+        active_notes.clear()
+
+    # finally, add a clean End-of-Track
+    track.append(MetaMessage('end_of_track', time=0))
     return new_mid
 
 # =========================================================================== #
