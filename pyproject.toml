@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyramidi"
-version = "2.0.0.9996"
+version = "2.0.0.9995"
 authors = [
   { name="Konrad Swierczek", email="swierckj@mcmaster.ca" },
 ]

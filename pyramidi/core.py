@@ -72,89 +72,53 @@ def get_tempo(midi_file):
     return tempo[0]
 
 # =========================================================================== #
-def get_ticks_from_measures(mid: MidiFile, n_measures: int) -> int:
+def get_ticks_mm(midi: MidiFile, n_measures: int = 8) -> int:
     """
-    Calculate the raw tick position after counting `n_measures` bars, ignoring time from program_change messages
-    when counting measures, but including their ticks in the returned raw tick value.
-
-    Parameters
-    ----------
-    mid : MidiFile
-        A mido MidiFile instance (must be type 0).
-    n_measures : int
-        The number of measures (bars) to count.
-
-    Returns
-    -------
-    int
-        The raw tick position at the end of the nth measure, including program_change deltas.
-        If the file ends before n_measures, returns the total raw length and issues a warning.
+    Walk through the single track of a type‑0 file until `n_measures` have elapsed,
+    then return the total number of ticks.
+    Assumes an initial time signature of 4/4 if none is encountered immediately.
     """
-    # PPQ: ticks per quarter-note
-    ppq = mid.ticks_per_beat
+    tpb = midi.ticks_per_beat
 
-    # Phase 1: collect time-signature events with both raw and effective tick positions
-    events = []  # tuples: (raw_tick, eff_tick, numerator, denominator)
-    raw_tick = 0
-    eff_tick = 0
-    for msg in mid.tracks[0]:
-        delta = msg.time
-        raw_tick += delta
-        if msg.type != 'program_change':
-            eff_tick += delta
-        if msg.type == 'time_signature':
-            events.append((raw_tick, eff_tick, msg.numerator, msg.denominator))
-    # total lengths
-    total_raw = raw_tick
-    total_eff = eff_tick
+    # Default time‑signature = 4/4
+    numerator, denominator = 4, 4
+    ticks_per_measure = numerator * (4 / denominator) * tpb
 
-    # ensure an initial time signature at tick 0
-    if not events or events[0][0] != 0:
-        events.insert(0, (0, 0, 4, 4))
-    # sentinel event at end
-    events.append((total_raw, total_eff, None, None))
-
-    # compute the effective tick where the nth measure boundary falls
+    total_ticks = 0
+    measure_ticks = 0
     measures_counted = 0
-    measure_end_eff = None
-    for (start_raw, start_eff, num, denom), (next_raw, next_eff, *_) in zip(events, events[1:]):
-        segment_eff = next_eff - start_eff
-        # ticks per measure in this signature
-        tpm = ppq * num * (4 / denom)
-        full = int(segment_eff // tpm)
-        if measures_counted + full >= n_measures:
-            need = n_measures - measures_counted
-            measure_end_eff = start_eff + need * tpm
-            break
-        measures_counted += full
 
-    # if not found, warn and return full length
-    if measure_end_eff is None:
-        warnings.warn(
-            f"File ends after {measures_counted} measures; returning full raw length ({total_raw} ticks)",
-            UserWarning
-        )
-        return total_raw
+    # Only one track in type 0
+    track = midi.tracks[0]
 
-    # Phase 2: map the effective boundary back to raw tick
-    raw_tick = 0
-    eff_tick = 0
-    for msg in mid.tracks[0]:
-        delta = msg.time
-        raw_tick += delta
-        if msg.type != 'program_change':
-            prev_eff = eff_tick
-            eff_tick += delta
-            if eff_tick >= measure_end_eff:
-                # boundary occurred within this delta
-                overshoot = eff_tick - measure_end_eff
-                boundary_delta = delta - overshoot
-                return int(raw_tick - delta + boundary_delta)
-    # fallback
-    return total_raw
+    for msg in track:
+
+        # Add measure for anacrusis
+        if msg.type == "program_change" and msg.time > 0:
+            n_measures += 1
+
+        # Handle time‑signature changes
+        if msg.type == "time_signature":
+            numerator, denominator = msg.numerator, msg.denominator
+            ticks_per_measure = numerator * (4 / denominator) * tpb
+            measure_ticks = 0  # reset into the new signature
+
+        # Advance time
+        total_ticks += msg.time
+        measure_ticks += msg.time
+
+        # Count off full measures (catches any overshoot)
+        while measure_ticks >= ticks_per_measure:
+            measures_counted += 1
+            measure_ticks -= ticks_per_measure
+
+            if measures_counted >= n_measures:
+                return total_ticks
+
+    return total_ticks
 
 # =========================================================================== #
-def pre_process(mid: MidiFile) -> MidiFile:
+def pre_process(midi: MidiFile) -> MidiFile:
     """
     Convert any MidiFile (type 0, 1, or 2) into a type 0 MidiFile by merging all tracks.
 
@@ -169,16 +133,14 @@ def pre_process(mid: MidiFile) -> MidiFile:
         A new MidiFile of type 0, with one track containing all merged events.
     """
     # Create a new MidiFile with type 0 and same timing resolution
-    new_mid = MidiFile(type=0, ticks_per_beat=mid.ticks_per_beat)
+    new_mid = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
 
     # Merge all existing tracks into a single track
-    merged = merge_tracks(mid.tracks)
+    merged = merge_tracks(midi.tracks)
 
     # Create a new track and copy merged events into it
-    track0 = MidiTrack()
-    track0.extend(merged)
+    new_mid.tracks.append(merged)
 
-    new_mid.tracks.append(track0)
     return new_mid
     
 # =========================================================================== #
@@ -220,9 +182,9 @@ def filter_msgs(mid: MidiFile, types_to_filter):
 # =========================================================================== #
 def cut_midi(mid: MidiFile, cut_tick: int) -> MidiFile:
     """
-    Return a new MidiFile (Type 0) containing only events up to `cut_tick`.
+    Return a new MidiFile (Type 0) containing only events strictly before `cut_tick`.
+    Ensures all notes active at `cut_tick` are turned off at that point, and adds a single End-of-Track.
     """
-    # make an empty MIDI with same timing
     new_mid = MidiFile(type=0)
     new_mid.ticks_per_beat = mid.ticks_per_beat
 
@@ -230,58 +192,48 @@ def cut_midi(mid: MidiFile, cut_tick: int) -> MidiFile:
     new_mid.tracks.append(track)
 
     cum_tick = 0
-    # keep track of which notes are currently on, so we can turn them off
-    active_notes = {}
+    active_notes = {}  # (channel, note) -> count
 
     for msg in mid.tracks[0]:
-        # if we've already reached or passed the cut, skip everything
-        if cum_tick >= cut_tick:
-            break
+        next_tick = cum_tick + msg.time
 
-        # if this message would go past the cut:
-        if cum_tick + msg.time > cut_tick:
-            # include a truncated delta
-            delta = cut_tick - cum_tick
-            # insert a “dummy” message with just the delta (no real event)
-            # OR attach that delta to the next meta/end_of_track
-            if not msg.is_meta and msg.type.startswith('note_'):
-                # we won’t include the original msg, just advance time
-                track.append(Message('note_off', note=0, velocity=0, time=delta))
-            else:
-                # for meta (including tempo), we skip the event but absorb the time
-                track.append(MetaMessage('end_of_track', time=delta))
-            cum_tick = cut_tick
-            break
+        # copy only messages strictly before the cut
+        if next_tick < cut_tick:
+            copy = msg.copy()
+            track.append(copy)
+            cum_tick = next_tick
+            # track note state
+            if not msg.is_meta and msg.type == 'note_on' and msg.velocity > 0:
+                key = (msg.channel, msg.note)
+                active_notes[key] = active_notes.get(key, 0) + 1
+            elif not msg.is_meta and (msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0)):
+                key = (msg.channel, msg.note)
+                if key in active_notes:
+                    active_notes[key] -= 1
+                    if active_notes[key] <= 0:
+                        del active_notes[key]
+            continue
 
-        # otherwise, copy the message in full
-        # but watch for note_on/off to track active notes
-        copy = msg.copy()
-        track.append(copy)
-        cum_tick += msg.time
-
-        # track active notes so we can shut them all off at the end
+        # any event at or beyond cut_tick truncates here
+        delta = cut_tick - cum_tick
+        # if the original event was a note_on, send its off counterpart at cut
         if not msg.is_meta and msg.type == 'note_on' and msg.velocity > 0:
-            active_notes.setdefault((msg.channel, msg.note), 0)
-            active_notes[(msg.channel, msg.note)] += 1
-        elif not msg.is_meta and (
-              (msg.type == 'note_off') or
-              (msg.type == 'note_on' and msg.velocity == 0)
-            ):
-            key = (msg.channel, msg.note)
-            if key in active_notes:
-                active_notes[key] -= 1
-                if active_notes[key] <= 0:
-                    del active_notes[key]
+            track.append(Message(
+                'note_off', note=msg.note, velocity=0,
+                channel=msg.channel, time=delta
+            ))
+        else:
+            # absorb any leftover time into a no-op meta to align the cut
+            track.append(MetaMessage('track_name', name='', time=delta))
+        cum_tick = cut_tick
+        break
 
-    # at cut point, make sure any still-on notes get turned off immediately
-    if active_notes:
-        for (chan, note), count in list(active_notes.items()):
-            # velocity 0 note_on is equivalent to note_off
-            track.append(Message('note_on', note=note, velocity=0,
-                                 channel=chan, time=0))
-        active_notes.clear()
+    # shut off any notes still active at the cut
+    for (chan, note) in list(active_notes.keys()):
+        track.append(Message('note_off', note=note, velocity=0, channel=chan, time=0))
+    active_notes.clear()
 
-    # finally, add a clean End-of-Track
+    # add single End-of-Track
     track.append(MetaMessage('end_of_track', time=0))
     return new_mid
 
