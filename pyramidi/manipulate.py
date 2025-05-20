@@ -2,7 +2,7 @@
 """
 ###############################################################################
 # Third-Party Imports
-from mido import MidiFile, MidiTrack
+from mido import MidiFile, MidiTrack, MetaMessage
 ###############################################################################
 # Constants
 __all__ = ['ManipulateMIDI']
@@ -146,7 +146,7 @@ def change_velocity(midiFile: MidiFile, velocity = 64):
     """
     Changes the velocity of all 'note_on' events in the MIDI file to a specified value,
     only if the current velocity is greater than 0.
-
+first_time
     Parameters:
         midiFile (mido.MidiFile): The original MIDI file.
         velocity (int): The new velocity value to set for 'note_on' events.
@@ -201,14 +201,20 @@ def change_tempo(midiFile: MidiFile, tempo: int = 500000):
     track = MidiTrack()
     new.tracks.append(track)
 
+    saw_tempo = False
+
     # Iterate over each track and its messages
     for i in range(len(midiFile.tracks)):
         for msg in midiFile.tracks[i]:
             if msg.type == "set_tempo":
                 # Replace tempo with the specified value
                 track.append(msg.copy(tempo=tempo))
+                saw_tempo = True
             else:
                 track.append(msg)  # Copy other messages as they are
+    
+    if not saw_tempo:
+        track.insert(3, MetaMessage('set_tempo', tempo = tempo, time = 0))
 
     return new
 
