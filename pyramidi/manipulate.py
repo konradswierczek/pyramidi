@@ -142,6 +142,55 @@ def change_pitchHeight(
     return new
 
 ###############################################################################
+def change_articulation(midi_file: MidiFile, articulation=0.25):
+    new_mid = MidiFile(ticks_per_beat=midi_file.ticks_per_beat)
+
+    for track in midi_file.tracks:
+        abs_time = 0
+        events = []
+
+        for msg in track:
+            abs_time += msg.time
+            events.append((abs_time, msg.copy()))
+
+        active_notes = {}
+        new_events = []
+
+        for time, msg in events:
+            if msg.type == 'note_on' and msg.velocity > 0:
+                active_notes[(msg.channel, msg.note)] = time
+                new_events.append((time, msg))
+
+            elif (
+                msg.type == 'note_off'
+                or (msg.type == 'note_on' and msg.velocity == 0)
+            ):
+                key = (msg.channel, msg.note)
+                if key in active_notes:
+                    start = active_notes.pop(key)
+                    duration = time - start
+                    new_duration = max(1, int(duration * articulation))
+                    new_off_time = start + new_duration
+                    new_events.append((new_off_time, msg))
+                else:
+                    new_events.append((time, msg))
+            else:
+                new_events.append((time, msg))
+
+        new_events.sort(key=lambda x: x[0])
+
+        new_track = MidiTrack()
+        last_time = 0
+        for abs_time, msg in new_events:
+            msg.time = abs_time - last_time
+            new_track.append(msg)
+            last_time = abs_time
+
+        new_mid.tracks.append(new_track)
+
+    return new_mid
+
+###############################################################################
 def change_velocity(midiFile: MidiFile, velocity = 64):
     """
     Changes the velocity of all 'note_on' events in the MIDI file to a specified value,
@@ -217,42 +266,5 @@ def change_tempo(midiFile: MidiFile, tempo: int = 500000):
         track.insert(3, MetaMessage('set_tempo', tempo = tempo, time = 0))
 
     return new
-
-###############################################################################
-# DEV
-def change_articulation(midiFile: str, duration: float = 1):
-    """
-    """
-    #midiFile = MidiFile (midiFile)
-    new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
-    track = MidiTrack()
-    new.tracks.append(track)
-    for i in range(len(midiFile.tracks)):
-        for msg in midiFile.tracks[i]:
-            if msg.type in ["note_on", "note_off"]:
-                if msg.time > 0:
-                    track.append(msg.copy(time = int(msg.time * duration)))
-                else: 
-                    track.append(msg)
-            else:
-                track.append(msg)
-    return new
-
-"""
-abs_time = 0
-for i in range(len(midiFile.tracks)):
-    for msg in midiFile.tracks[i]:
-        abs_time = abs_time + msg.time
-        print(msg.copy(time = abs_time))
-        if msg.type == "note_on":
-            for next_msg in midiFile.tracks[i][index + 1:]:
-                if msg.type == "note_off" or msg.velocity == 0:
-                    pass
-"""           
-###############################################################################
-def export(midiFile, filename):
-    """
-    """
-    midiFile.save(filename)
 
 ###############################################################################
