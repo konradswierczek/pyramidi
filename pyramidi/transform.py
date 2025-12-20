@@ -18,24 +18,24 @@ class ManipulateMIDI:
     """
     def __init__(
         self,
-        midi_file: str,
+        midi: str,
         output_file: str = "output.mid",
         file = True
     ):
         """
         """
-        self.midi_file = midi_file
+        self.midi = midi
         self.output_file = output_file
         if file == True:
-            self.midi = MidiFile(midi_file)
+            self.midi = MidiFile(midi)
         else:
-            self.midi = midi_file
+            self.midi = midi
         self.manipulated_midi = None
     ###########################################################################
     def __str__(self):
         """
         """
-        return self.midi_file
+        return self.midi
     ###########################################################################
     def manipulate(
         self,
@@ -148,7 +148,7 @@ def change_pitchHeight(
 
 ###############################################################################
 def change_articulation(
-    midi_file: MidiFile,
+    midi: MidiFile,
     articulation: float = 0.75
 ):
     """Change the 'on' duration of all note messages.
@@ -162,9 +162,9 @@ def change_articulation(
 
     """
     # TODO: ADD CHECK FOR > 0 < 1
-    new_mid = MidiFile(ticks_per_beat=midi_file.ticks_per_beat)
+    new_midi = MidiFile(ticks_per_beat = midi.ticks_per_beat)
 
-    for track in midi_file.tracks:
+    for track in midi.tracks:
         abs_time = 0
         events = []
 
@@ -205,9 +205,9 @@ def change_articulation(
             new_track.append(msg)
             last_time = abs_time
 
-        new_mid.tracks.append(new_track)
+        new_midi.tracks.append(new_track)
 
-    return new_mid
+    return new_midi
 
 ###############################################################################
 def change_velocity(

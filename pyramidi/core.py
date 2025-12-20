@@ -36,7 +36,7 @@ def get_timeSignature(midi: MidiFile):
     """
     found = []
     # Check all tracks.
-    for track in mid.tracks:
+    for track in midi.tracks:
         for msg in track:
             if msg.type == 'time_signature':
                 ts = (msg.numerator, msg.denominator)
