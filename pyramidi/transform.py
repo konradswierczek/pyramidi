@@ -1,12 +1,18 @@
 """
+Tools for applying transformations to midi files.
+
+Functions
+- change_pitchHeight
+- change_articulation
+- change_velocity
+- change_tempo
 """
 ###############################################################################
 # Third-Party Imports
 from mido import MidiFile, MidiTrack, MetaMessage
+
 ###############################################################################
-# Constants
-__all__ = ['ManipulateMIDI']
-###############################################################################
+# THIS NEEDS REWORKING.
 class ManipulateMIDI:
     """
     """
@@ -81,55 +87,54 @@ class ManipulateMIDI:
                         velocity = velocity,
                         articulation = articulation)
         self.export()
-
-########################################################################
-def check_midiNo(note: int, min: int = 0, max: int = 127):
-    """
-    Ensures that a MIDI note number is within the valid range (min to max).
-    
-    This function checks if the given MIDI note falls within the specified range of 
-    allowed MIDI note numbers (by default 0 to 127). If the note is outside the range, 
-    it adjusts the note by shifting it by an octave (12 semitones) until it is within the range.
-    
-    The function recursively adjusts the note by adding or subtracting octaves (12 semitones) 
-    as needed to ensure the note falls between the `min` and `max` values.
-
-    Parameters:
-        note (int): The MIDI note number to check. MIDI notes are integers, with 0 being the lowest note.
-        min (int, optional): The minimum valid MIDI note number. Default is 0.
-        max (int, optional): The maximum valid MIDI note number. Default is 127.
-
-    Returns:
-        int: The adjusted MIDI note number, within the specified range.
-
-    Example:
-        note = check_midiNo(130)   # Will return 118 (130 - 12 = 118).
-        note = check_midiNo(-5)    # Will return 7 (-5 + 12 = 7).
-    """
-    # Adjust the note until it's within the valid range
-    while note < min or note > max:
-        if note > max:
-            note -= 12  # Adjust note by subtracting an octave
-        elif note < min:
-            note += 12  # Adjust note by adding an octave
-
-    return note  # Return the valid note
     
 ###############################################################################
 def change_pitchHeight(
-    midiFile: str,
-    semitones = 0,
+    midi: MidiFile,
+    semitones: int = 0,
     min: int = 0,
     max: int = 127
 ):
+    """Transpose all pitches in a MidiFile.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+    semitones (int) -- Number of semitones to transpose.
+
+    Returns:
+    MidiFile -- A transformed mido MidiFile
+
     """
-    """
-    #midiFile = MidiFile (midiFile)
-    new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
+    def check_midiNo(note: int, min: int = 0, max: int = 127):
+        """Check if a MIDI number fits in a range.
+
+        Arguments:
+        note (int) -- A MIDI number, the note to check
+        min (int) -- Minimum MIDI number allowed, usually the bottom limit of a sound font
+        max (int) -- Maximum MIDI number allowed, usually the bottom limit of a sound font
+
+
+        Returns:
+        int -- The valid octave shifted note
+
+        Not as relevant anymore.
+        """
+        # Adjust the note until it's within the valid range.
+        while note < min or note > max:
+            if note > max:
+                note -= 12  # Adjust note by subtracting an octave.
+            elif note < min:
+                note += 12  # Adjust note by adding an octave.
+
+        return note  # Return the valid note.
+
+    ############################################################################
+    # TODO: Add arg for only allowed note range.
+    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
     track = MidiTrack()
-    new.tracks.append(track)
-    for i in range(len(midiFile.tracks)):
-        for msg in midiFile.tracks[i]:
+    new_midi.tracks.append(track)
+    for i in range(len(midi.tracks)):
+        for msg in midi.tracks[i]:
             if msg.type in ["note_on", "note_off"]:
                 new_note = check_midiNo(
                     msg.note + semitones, 
@@ -139,10 +144,24 @@ def change_pitchHeight(
                 track.append(msg.copy(note = new_note))
             else:
                 track.append(msg)   
-    return new
+    return new_midi
 
 ###############################################################################
-def change_articulation(midi_file: MidiFile, articulation=0.25):
+def change_articulation(
+    midi_file: MidiFile,
+    articulation: float = 0.75
+):
+    """Change the 'on' duration of all note messages.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+    articulation (int) -- Articulation factor, a proportion of 1
+
+    Returns:
+    MidiFile -- A transformed mido MidiFile
+
+    """
+    # TODO: ADD CHECK FOR > 0 < 1
     new_mid = MidiFile(ticks_per_beat=midi_file.ticks_per_beat)
 
     for track in midi_file.tracks:
@@ -191,80 +210,75 @@ def change_articulation(midi_file: MidiFile, articulation=0.25):
     return new_mid
 
 ###############################################################################
-def change_velocity(midiFile: MidiFile, velocity = 64):
-    """
-    Changes the velocity of all 'note_on' events in the MIDI file to a specified value,
-    only if the current velocity is greater than 0.
-first_time
-    Parameters:
-        midiFile (mido.MidiFile): The original MIDI file.
-        velocity (int): The new velocity value to set for 'note_on' events.
-        
+def change_velocity(
+    midi: MidiFile,
+    velocity: int = 64
+):
+    """Change the velocity of all notes.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+    velocity (int) -- Velocity to transform, in MIDI format (must be 0 - 127)
+
     Returns:
-        mido.MidiFile: A new MIDI file with the modified velocities.
+    MidiFile -- A transformed mido MidiFile
+
     """
-    # Create a new MidiFile with the same ticks_per_beat
-    new = MidiFile(type=0, ticks_per_beat=midiFile.ticks_per_beat)
+    # TODO: Check values for 0-127
+    # Create a new MidiFile with the same ticks_per_beat.
+    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
     track = MidiTrack()
-    new.tracks.append(track)
+    new_midi.tracks.append(track)
 
-    # Iterate over each track and its messages
-    for i in range(len(midiFile.tracks)):
-        for msg in midiFile.tracks[i]:
+    # Iterate over each track and its messages.
+    for i in range(len(midi.tracks)):
+        for msg in midi.tracks[i]:
             if msg.type == "note_on":
-                # Check if the current velocity is greater than 0 before changing
+                # Check if the current velocity is greater than 0 before changing.
                 if msg.velocity > 0:
-                    track.append(msg.copy(velocity=int(velocity)))  # Apply new velocity
+                    track.append(msg.copy(velocity = int(velocity)))  # Apply new velocity.
                 else:
-                    track.append(msg)  # Leave the message as is
+                    track.append(msg)  # Leave the message as is.
             else:
-                track.append(msg)  # Copy other messages as they are
+                track.append(msg)  # Copy other messages as they are.
 
-    return new
+    return new_midi
 
 ###############################################################################
-def change_tempo(midiFile: MidiFile, tempo: int = 500000):
-    """
-    Changes the tempo of all 'set_tempo' events in a MIDI file to a specified value.
+def change_tempo(
+    midi: MidiFile,
+    tempo: int = 500000
+):
+    """ Change the tempo of an entire MidiFile.
 
-    This function creates a new MIDI file with the same structure as the original, 
-    but with the tempo of all 'set_tempo' events replaced by the given `tempo` value.
-    The `tempo` is specified in microseconds per quarter note. If no `tempo` is provided, 
-    it defaults to 500000 (which corresponds to 120 beats per minute).
-
-    Parameters:
-        midiFile (mido.MidiFile): The original MIDI file to modify.
-        tempo (int, optional): The new tempo value to set for all 'set_tempo' events.
-                               The default is 500000 (representing 120 beats per minute).
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+    tempo (int) -- Tempo to transform, in microseconds per quarter note.
 
     Returns:
-        mido.MidiFile: A new MIDI file with the modified tempo events.
-        
-    Example:
-        midi = mido.MidiFile('input.mid')
-        modified_midi = change_tempo(midi, tempo=600000)  # Set tempo to 100 BPM
-        modified_midi.save('output.mid')
+    MidiFile -- A transformed mido MidiFile
+
     """
-    # Create a new MidiFile with the same ticks_per_beat
-    new = MidiFile(type=0, ticks_per_beat=midiFile.ticks_per_beat)
+    # Create a new MidiFile with the same ticks_per_beat.
+    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
     track = MidiTrack()
-    new.tracks.append(track)
+    new_midi.tracks.append(track)
 
     saw_tempo = False
 
-    # Iterate over each track and its messages
-    for i in range(len(midiFile.tracks)):
-        for msg in midiFile.tracks[i]:
+    # Iterate over each track and its messages.
+    for i in range(len(midi.tracks)):
+        for msg in midi.tracks[i]:
             if msg.type == "set_tempo":
-                # Replace tempo with the specified value
-                track.append(msg.copy(tempo=tempo))
+                # Replace tempo with the specified value.
+                track.append(msg.copy(tempo = tempo))
                 saw_tempo = True
             else:
-                track.append(msg)  # Copy other messages as they are
+                track.append(msg)  # Copy other messages as they are.
     
     if not saw_tempo:
         track.insert(3, MetaMessage('set_tempo', tempo = tempo, time = 0))
 
-    return new
+    return new_midi
 
 ###############################################################################
