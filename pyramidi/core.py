@@ -14,8 +14,9 @@ Functions
 - midi2keyboard
 """
 ###############################################################################
-# Local Imports
+# Built-in Imports
 from warnings import warn
+from collections import defaultdict
 # Third Party Imports
 from mido import (
     MidiFile, MidiTrack, tempo2bpm, merge_tracks, MetaMessage, Message
@@ -312,5 +313,78 @@ def midi2keyboard(midi_number: int):
         return midi_number - 20
     else:
         raise ValueError("midi_number must be integer between 0 and 127!")
+
+###############################################################################
+def slice_salami(midi: MidiFile):
+    """Reduce to chords.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+
+    Returns:
+    List of tuples -- Each tuple is two dimensions, a list of MIDI numbers and a equivilant quarter-length duration value.
+
+    """
+    slices = []
+    current_chord = set()
+
+    for msg in midi.tracks[0]: # Type 0 assumed.
+        # If time has passed, close the previous slice.
+        if msg.time > 0:
+            if current_chord:
+                slices.append((
+                    sorted(current_chord),
+                    msg.time  # absolute tick duration.
+                ))
+
+        # Update chord state AFTER closing the slice.
+        if msg.type == 'note_on' and msg.velocity > 0:
+            current_chord.add(msg.note)
+
+        elif msg.type == 'note_off' or (
+            msg.type == 'note_on' and msg.velocity == 0
+        ):
+            current_chord.discard(msg.note)
+
+        # Ignore all other message types.
+
+    return slices
+
+###############################################################################
+def get_notes(midi: MidiFile):
+    """
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+
+    Returns:
+    list of tuples -- Each tuple is a not event, with its note number, duration in ticks, and a placeholder for order.
+
+    """
+    note_events = []
+
+    # Active notes: (channel, note) -> list of start times
+    active_notes = defaultdict(list)
+
+    for track in midi.tracks:
+        absolute_time = 0
+
+        for msg in track:
+            absolute_time += msg.time
+
+            if msg.type == 'note_on' and msg.velocity > 0:
+                # Note start
+                key = (msg.channel, msg.note)
+                active_notes[key].append(absolute_time)
+
+            elif msg.type in ('note_off', 'note_on') and msg.velocity == 0:
+                # Note end
+                key = (msg.channel, msg.note)
+                if active_notes[key]:
+                    start_time = active_notes[key].pop()
+                    length = absolute_time - start_time
+                    note_events.append((msg.note, length, None))
+
+    return note_events
 
 ###############################################################################
