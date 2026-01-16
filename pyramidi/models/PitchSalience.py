@@ -1,13 +1,17 @@
 """
 Pitch Salience Algorithm based on Parncutt 1988,1993
-Implemented by Konrad Swierczek and Karen Chan 2022
+Implemented by Konrad Swierczek and Karen Chan in 2022
 Digital Music Lab, McMaster University
+
+TODO: Run tests for version 2 (unlikely there will be issues since format hasn't changed on this end)
+TODO: Update documentation to be consistent with version 2.
 """
 ###############################################################################
 # Constants
 __all__ = [
     'PitchSalience'
 ]
+
 WEIGHTS88 = [
     1,
     0,

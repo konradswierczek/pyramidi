@@ -1,11 +1,142 @@
 """
+
+
 """
+
 ###############################################################################
-# Local Imports
+# Built-in Imports
+from itertools import combinations
 # Third Party Imports
 from mido import MidiFile, tempo2bpm, MidiTrack
-from itertools import combinations
+# Local Imports
+from pyramidi import get_notes
+
 ###############################################################################
+def get_pcd(midi: MidiFile):
+    """Compute a pitch-class distribution.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+
+    Returns:
+    dictionary -- a pitch class distribution (key = pitch class, value = total ticks)
+
+    """
+    # TODO: Add velocity weighting
+    # TODO: Add parncutt/eerola thing?
+    # TODO: Add normalized?
+    pcd = dict.fromkeys(range(0,12), 0)
+    notes = get_notes(midi)
+    for note in notes:
+        pc = note[0]%12
+        pcd[pc] = pcd[pc] + note[1]
+    return pcd
+
+###############################################################################
+def get_pc(chord):
+        """Get unique pitch classes.
+
+        Arguments:
+        chord (list) -- MIDI or pitch classes
+
+        Returns:
+        set -- Unique pitch classes
+        
+        """
+        if not isinstance(chord, list):
+                raise TypeError(
+                        "Must be list of MIDI or pitch class numbers."
+                )
+        return set([note % 12 for note in chord])
+
+###############################################################################
+def get_ambitus(midi: MidiFile):
+    """Get the lowest and highest pitch.
+
+    Arguments:
+    midi (MidiFIle) -- A mido MidiFile.
+
+    Returns:
+    tuple -- lowest and highest MIDI number.
+
+    """
+    note_list = []
+    for track in midi.tracks:
+        for msg in track:
+            if msg.type == "note_on":
+                note_list.append(msg.note)
+    return min(note_list), max(note_list)
+
+###############################################################################
+def get_intervals(chord):
+        """All interval classes of a choord
+
+        Arguments:
+        chord (list) -- MIDI numbers or pitch classes
+
+        Returns:
+        list -- interval classes
+        """
+        # Get all intervals
+        combos = list(combinations(get_pc(chord), 2))
+        intervals = [abs(pitch[0]- pitch[1])%12 for pitch in combos]
+        return intervals
+
+###############################################################################
+def interval_vector(chord):
+        """Interval Vector of a chord after Forte 1973.
+
+        Arguments:
+        chord (list) -- MIDI numbers or pitch classes
+
+        Returns:
+        list -- interval vector
+
+        """
+        intervals = get_intervals(chord)
+        for ind,interval in enumerate(intervals):
+                if interval > 6:
+                        intervals[ind] = 12 - intervals[ind]
+        interval_vector = [0 for i in range(6)]
+        for interval in intervals:
+                interval_vector[interval-1] = interval_vector[interval-1] + 1
+        return interval_vector
+
+###############################################################################
+def bass_intervals(chord: list):
+        """Semitone distances between lowest note in a chord.
+        
+        Arguments:
+        chord (list) -- list of MIDI or pitch class numbers representing a chord
+
+        Returns:
+        tuple -- interval classes from bass note
+
+        """
+        int = [abs(chord[0]-chord[note])%12 for note in range(1,len(chord))]
+        if 0 in int:
+                int.remove(0)
+                return tuple(int)
+        else: 
+                return tuple(int)
+
+###############################################################################
+def identify_chordQuality(chord):
+        """
+        """
+        pass
+
+###############################################################################
+def identify_chord(chord):
+        """
+        """
+        pass
+
+###############################################################################
+
+
+
+# WIP STUFF
 # Constants
 __all__ = []
 #maj = tuple([{(pitch + pc)%12 for pitch in [0,4,7]} for pc in range (0,12)])
@@ -122,116 +253,10 @@ NOTE_KEYS = {'Cmaj':{0:'C',1:'C#',2:'D',3:'D#',4:'E',5:'F',6:'F#',
             }
 
 ALLIC = list(range(0,12))
-###############################################################################
-# NOT TESTED IN BETA
-def swierckj_pcd(midiFile, timebase = "seconds", velocity = "False"):
-    """
-    """
-    # TODO: Add vleocity weightings
-    midiFile = MidiFile(midiFile)
-    tpb = midiFile.ticks_per_beat
-    if "set_tempo" in [msg.type for msg in midiFile.tracks[0]]:
-        bpm = tempo2bpm([msg.tempo for msg in midiFile.tracks[0] if 
-                            msg.type == "set_tempo"][0])
-    else:
-        bpm = 120
-    if timebase == "seconds":
-        temp = 0
-        new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
-        track = MidiTrack()
-        new.tracks.append(track)
-        for i in range(len(midiFile.tracks)):
-                for msg in midiFile.tracks[i]:
-                    tick_time = ((msg.time / tpb) / bpm) * 60
-                    abs_time = tick_time + temp
-                    track.append(msg.copy(time = abs_time))
-                    temp = abs_time
-    elif timebase == "ticks":
-        temp = 0
-        new = MidiFile(type=0, ticks_per_beat = midiFile.ticks_per_beat)
-        track = MidiTrack()
-        new.tracks.append(track)
-        for i in range(len(midiFile.tracks)):
-                for msg in midiFile.tracks[i]:
-                    tick_time = msg.time
-                    abs_time = tick_time + temp
-                    track.append(msg.copy(time = abs_time))
-                    temp = abs_time
-    out = []
-    for i, msg in enumerate(new.tracks[0]):
-        if msg.type == "note_on":
-            for next in range(i + 1, len(new.tracks[0])):
-                if new.tracks[0][next].type in ["note_off", "note_on"] and new.tracks[0][next].note == msg.note:
-                    out.append({"note": msg.note,
-                                "velocity": msg.velocity,
-                                "time_on": msg.time,
-                                "time_off": new.tracks[0][next].time,
-                                "length": (new.tracks[0][next].time - msg.time)})
-                    break
-    pcd = dict.fromkeys(range(0,12), 0)
-    for msg in out:
-        pc = msg["note"]%12
-        pcd[pc] = pcd[pc] + msg["length"]
-    return {pc: pcd[pc]/sum(pcd.values()) for pc in range(0,12)}
-
-###############################################################################
-def get_ambitus(midi):
-    """
-    """
-    number_list = []
-    for track in midi.tracks:
-        for msg in track:
-            if msg.type == "note_on":
-                number_list.append(msg.note)
-    return min(number_list), max(number_list)
 
 ###############################################################################
 # NOT TESTED IN BETA
-def unique_pc(chord):
-        """
-        Returns tuple of unique pitch classes in a chord.
-                Arguments: 
-                        chord (list): MIDI or pitch class numbers
-        
-        """
-        if not isinstance(chord, list):
-                raise TypeError(
-                        "Must be list of MIDI or pitch class numbers."
-                )
-        return set([note % 12 for note in chord])
-###############################################################################
-# NOT TESTED IN BETA
-def bass_intervals(chord):
-        """
-        Returns tuple of semitone distances between lowest note in a chord
-        and every other note in the chord. 
-            chord = list of MIDI or pitch class numbers representing a chord
-        """
-        int = [abs(chord[0]-chord[note])%12 for note in range(1,len(chord))]
-        if 0 in int:
-                int.remove(0)
-                return tuple(int)
-        else: 
-                return tuple(int)
 
-###############################################################################
-# NOT TESTED IN BETA
-def interval_vector(chord):
-        """ Returns Interval Vector of a chord after Forte 1973.
-            chord = list of MIDI or pitch class numbers representing a chord
-        """
-        
-        combos = list(combinations(unique_pc(chord),2))
-        intervals = [abs(pitch[0]- pitch[1])%12 for pitch in combos]
-        for ind,interval in enumerate(intervals):
-                if interval > 6:
-                        intervals[ind] = 12 - intervals[ind]
-        intervalvector = [0 for i in range(6)]
-        for interval in intervals:
-                intervalvector[interval-1] = intervalvector[interval-1] + 1
-        return intervalvector
-
-###############################################################################
 # NOT TESTED IN BETA
 def chord_quality(chord):
         """ Returns chord quality for chord symbols. See 'CHORD_IVS' for list. 
@@ -344,50 +369,35 @@ test_dict = {
              tuple([{(pitch + pc)%12 for pitch in [0,3,6]} for pc in range (0,12)]): 'dim'
             }
 """
+
 ###############################################################################
 # NOT TESTED IN BETA
-def salami(midi_file, direct: bool = False):
+def beat_density(midi_file: str = 'tests/test.mid'):
+    midi = midi_file
+    ticks = int(second2tick(midi.length, midi.ticks_per_beat, get_tempo(midi)))
+    beats = int(ticks / midi.ticks_per_beat)
+    slices = salami(midi)
+    return len(slices) / beats
+
+###############################################################################
+# NOT TESTED IN BETA
+def onset_rate(midiFile, time_unit: str = "beat", direct: bool = False):
     """
     """
     if not direct:
-        midi = MidiFile(midi_file)
+        midi = MidiFile(midiFile)
     else:
-        midi = midi_file
-    slices = []
-    current_chord = set()
-    current_time = 0
-    start_time = 0
-    
-    for i, track in enumerate(midi.tracks):
-        for msg in midi.tracks[i]:
-            current_time += msg.time
-            if current_time == start_time:
-                pass
-            elif slices and slices[-1][0] == current_chord:
-                pass
-            elif not current_chord:
-                pass
-            else:
-                slices.append([sorted(list(current_chord)),
-                               (current_time - start_time) / midi.ticks_per_beat])
-            start_time = current_time
-            # If no time has passed, just add it or remove it.
-            if msg.time == 0:
-                if msg.type == 'note_on' and msg.velocity > 0:
-                    current_chord.add(msg.note)
-                elif msg.type == 'note_off' or msg.type == "note_on" and msg.velocity == 0:
-                    current_chord.discard(msg.note)
-                else:
-                    print("Unhandled MIDI message:", msg)
-                    continue
-            else:
-                if msg.type == 'note_on':
-                    current_chord.add(msg.note)
-                elif msg.type == 'note_off':
-                    current_chord.discard(msg.note)
-                else:
-                    print("Unhandled MIDI message:", msg)
-                    continue
-    return slices
+        midi = midiFile
+    tpb = midi.ticks_per_beat
+    tempo = [msg.tempo for msg in midi if msg.type == "set_tempo"][0]
+    length = int(second2tick(midi.length, tpb, tempo))
+    onsets = len(salami(midiFile, direct = direct))
+    if time_unit == "beat":
+        time_unit = length / tpb
+    elif time_unit == "length":
+        time_unit = midi.length
+    else:
+        print("error")
+    return onsets / time_unit
 
 ###############################################################################

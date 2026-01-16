@@ -32,13 +32,22 @@ Sapp, Craig Stuart.
 "Key-Profile Comparisons in Key-Finding by Correlation."
 International Conference on Music Perception and Cognition (ICMPC 10);
     2008, Sapporo, Japan.
+
+TODO: Run tests for version 2 (unlikely there will be issues since format hasn't changed on this end)
+TODO: Update documentation to be consistent with version 2.
 """
+
 ###############################################################################
 # Third Party Imports
 from scipy.stats import pearsonr, spearmanr
 from scipy.spatial.distance import cosine, euclidean
+
 ###############################################################################
 # Constants
+__all__ = [
+    "get_profiles", "get_similarity_metrics", "keyfinding", "mirmode"
+]
+
 PROFILES = {
     'KrumhanslKessler': {
         'major': [
@@ -270,30 +279,30 @@ SIMILARITY_METRICS = {
     'euclidean': lambda u, v: 1 - euclidean(u, v),
     'spearman': lambda u, v: spearmanr(u, v)[0] 
 }
+
 ###############################################################################
 def get_profiles():
-    """
-    Get the names of key-finding profiles available in this package.
-    Use to select a specific key-finding profile,
-    or to loop across all profiles.
+    """Get the names of key-finding profiles available in this package.
 
     Arguments:
-        None
+    None
     
     Returns:
-        Set of variables names associated with key profiles
+    set -- variables names associated with key profiles
+
     """
     return set([i for i in PROFILES.keys()])
 
 ###############################################################################
 def get_similarity_metrics():
-    """
+    """Get the names of similarity metrics availble for Krumhansl keyfinding.
 
     Arguments:
-        None
+    None
     
     Returns:
-        Set of variables names associated with 
+    set -- variables names associated with available similarity metrics.
+ 
     """
     return set([i for i in SIMILARITY_METRICS.keys()])
 
@@ -304,6 +313,15 @@ def keyfinding(
     similarity: str = 'pearsonr'
 ):
     """
+
+    Arguments:
+    pitchDistribution (list) --
+    profile (string) --
+    similarity (string) --
+
+    Returns:
+
+
     """
     if not isinstance(pitchDistribution, list):
         raise TypeError(
@@ -334,6 +352,16 @@ def mirmode(
     similarity: str = "pearsonr"
 ):
     """
+
+    Arguments:
+    pitchDistribution (list) --
+    weights (string) --
+    method (string) --
+    similarity (string) --
+
+    Returns:
+    float -- mirmode coefficient
+
     """
     if not isinstance(
         pitchDistribution,

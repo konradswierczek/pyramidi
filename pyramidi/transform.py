@@ -7,6 +7,7 @@ Functions
 - change_velocity
 - change_tempo
 """
+
 ###############################################################################
 # Third-Party Imports
 from mido import MidiFile, MidiTrack, MetaMessage

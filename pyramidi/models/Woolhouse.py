@@ -1,4 +1,7 @@
-
+"""
+TODO: Run tests for version 2 (unlikely there will be issues since format hasn't changed on this end)
+TODO: Update documentation to be consistent with version 2.
+"""
 from itertools import combinations
 __all__ = [
     'event_attraction',

@@ -7,12 +7,17 @@
     Mashinter 2006, Parncutt 2006, Harrison & Pearce 2020. Changes 
     Implemented by Konrad Swierczek, Karen Chan, & Matthew Woolhouse. 
     Digital Music Lab, McMaster University
+
+TODO: Run tests for version 2 (unlikely there will be issues since format hasn't changed on this end)
+TODO: Update documentation to be consistent with version 2.
 """
+
 ###############################################################################
 # Imports
 from math import *
 from itertools import combinations
 import numpy
+
 ###############################################################################
 __all__ = []
 CBWA = 1.72

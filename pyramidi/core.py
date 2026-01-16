@@ -13,6 +13,7 @@ Functions
 - find_msgType
 - midi2keyboard
 """
+
 ###############################################################################
 # Built-in Imports
 from warnings import warn
@@ -80,7 +81,7 @@ def get_totalTicks(midi: MidiFile):
     mid (MidiFile) -- a mido MidiFile
 
     Returns:
-    int: The total number of ticks in the MidiFile.
+    int -- The total number of ticks in the MidiFile.
     """
     total_time = 0
     for track in midi.tracks:
@@ -111,7 +112,7 @@ def get_tempo(midi_file):
 
 # =========================================================================== #
 def get_ticks_mm(midi: MidiFile, n_measures: int = 8) -> int:
-    """ Get the tick legnth of n measures.
+    """Get the tick legnth of n measures.
 
     Arguments:
     midi (MidiFile) -- A mido MidiFile
@@ -352,7 +353,7 @@ def slice_salami(midi: MidiFile):
 
 ###############################################################################
 def get_notes(midi: MidiFile):
-    """
+    """Get discrete note durations.
 
     Arguments:
     midi (MidiFile) -- A mido MidiFile
