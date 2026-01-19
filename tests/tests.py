@@ -1,33 +1,11 @@
+# TEST THE PARSE MODULE:
 from mido import MidiFile
-from pyramidi import *
-
+from pyramidi.parse import *
 midi = MidiFile("tests/test.mid")
-
-ts = get_timeSignature(midi)
-total_ticks = get_totalTicks(midi)
-tempo = get_tempo(midi)
-eight_measures = get_ticks_mm(midi, 8)
-# collapse_tracks
-# filter_msgs
-# cut_midi
-# find_msgType
-print(eight_measures) # BAD
-
-all_keyboard_numbers = [midi2keyboard(i) for i in range(0, 128)]
-
-print(
-    transform.change_articulation(midi)
-)
-
-print(
-    transform.change_tempo(midi)
-)
-
-print(
-    transform.change_pitchHeight(midi)
-)
-
-print(
-    transform.change_velocity(midi)
-)
-
+print(get_total_ticks(midi) == 34561)
+length_1 = get_measure_length(960, (4, 4))
+print(length_1 == 3840)
+midi = collapse_tracks(midi)
+length_8 = get_ticks_mm(midi)
+midi = cut_midi(midi, length_8)
+print(get_total_ticks(midi) ==length_1 * 8 )

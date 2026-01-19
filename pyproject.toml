@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyramidi"
-version = "2.0.0.9987"
+version = "2.0.0.9986"
 authors = [
   { name="Konrad Swierczek", email="swierckj@mcmaster.ca" },
 ]
@@ -22,9 +22,6 @@ classifiers = [
     "License :: OSI Approved :: GPL3",
     "Operating System :: OS Independent",
 ]
-
-[project.scripts]
-manipulateMIDI = "pyramidi.cli.manipulateMIDI:main"
 
 [project.urls]
 Homepage = "https://github.com/konradswierczek/pyramidi"

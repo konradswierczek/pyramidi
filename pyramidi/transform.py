@@ -12,90 +12,18 @@ Functions
 # Third-Party Imports
 from mido import MidiFile, MidiTrack, MetaMessage
 
+__all__ = [
+    "change_transposition", "change_articulation",
+    "change_velocity", "change_tempo"
+]
+
 ###############################################################################
-# THIS NEEDS REWORKING.
-class ManipulateMIDI:
-    """
-    """
-    def __init__(
-        self,
-        midi: str,
-        output_file: str = "output.mid",
-        file = True
-    ):
-        """
-        """
-        self.midi = midi
-        self.output_file = output_file
-        if file == True:
-            self.midi = MidiFile(midi)
-        else:
-            self.midi = midi
-        self.manipulated_midi = None
-    ###########################################################################
-    def __str__(self):
-        """
-        """
-        return self.midi
-    ###########################################################################
-    def manipulate(
-        self,
-        tempo: float = 120,
-        semitones: int = 0,
-        min_pitch: int = 0,
-        max_pitch: int = 127,
-        velocity: int = 64,
-        articulation: float = 1
-    ):
-        """
-        """
-        self.manipulated_midi = change_bpm(
-            self.midi,
-            bpm = tempo
-        )
-        self.manipulated_midi = change_pitchHeight(
-            self.manipulated_midi,
-            semitones = semitones,
-            min = min_pitch,
-            max = max_pitch
-        )
-        self.manipulated_midi = change_velocity(
-            self.manipulated_midi,
-            velocity = velocity
-        )
-        # TODO: make change_articulation work
-        #self.manipulated_midi = change_articulation(self.manipulated_mid,
-        #                                           articulation = articulation)
-    ###########################################################################
-    def export(self):
-        """
-        """
-        self.manipulated_midi.save(self.output_file)
-    ###########################################################################
-    def qwik(self,
-             tempo: float = 120,
-             semitones: int = 0,
-             min_pitch: int = 0,
-             max_pitch: int = 127,
-             velocity: int = 64,
-             articulation: float = 1):
-        """
-        """
-        self.manipulate(tempo = tempo,
-                        semitones = semitones,
-                        min_pitch = 0,
-                        max_pitch = 127,
-                        velocity = velocity,
-                        articulation = articulation)
-        self.export()
-    
-###############################################################################
-def change_pitchHeight(
+def change_transposition(
     midi: MidiFile,
     semitones: int = 0,
     min: int = 0,
     max: int = 127
-):
+) -> MidiFile:
     """Transpose all pitches in a MidiFile.
 
     Arguments:
@@ -151,7 +79,7 @@ def change_pitchHeight(
 def change_articulation(
     midi: MidiFile,
     articulation: float = 0.75
-):
+) -> MidiFile:
     """Change the 'on' duration of all note messages.
 
     Arguments:
@@ -214,7 +142,7 @@ def change_articulation(
 def change_velocity(
     midi: MidiFile,
     velocity: int = 64
-):
+) -> MidiFile:
     """Change the velocity of all notes.
 
     Arguments:
@@ -249,7 +177,7 @@ def change_velocity(
 def change_tempo(
     midi: MidiFile,
     tempo: int = 500000
-):
+) -> MidiFile:
     """ Change the tempo of an entire MidiFile.
 
     Arguments:
