@@ -9,70 +9,125 @@ Functions
 """
 
 ###############################################################################
+# Built-in Imports
+from copy import deepcopy
 # Third-Party Imports
 from mido import MidiFile, MidiTrack, MetaMessage
 
 __all__ = [
-    "change_transposition", "change_articulation",
-    "change_velocity", "change_tempo"
+    "change_transposition", "change_articulation", "change_velocity",
+    "change_tempo", "TransformMidi"
 ]
+
+###############################################################################
+class TransformMidi:
+    """
+    A pipeline for applying musical transformations to a mido.MidiFile.
+
+    This class stores the original MidiFile and a list of transformation functions. When `render()` is called, it creates a deep copy of the original MIDI and applies each transformation in input order, returning the transformed MidiFile.
+
+    Arguments:
+    midi (MidiFile) -- The original MIDI file to be transformed.
+
+    Attributes:
+    midi (MidiFile) -- The original MIDI file (kept intact).
+    transforms (list[tuple[callable, dict]]) -- A list of transformation functions and their keyword arguments.
+    """
+
+    def __init__(self, midi: MidiFile):
+        self.midi = midi
+        self.transforms = []
+
+    def add(self, transform_fn, **kwargs):
+        """Add a transformation to the pipeline.
+
+        Arguments:
+        transform_fn (callable) -- A function that takes a MidiFile and returns a transformed MidiFile.
+        **kwargs -- Keyword arguments passed to transform_fn when render() is called.
+
+        Returns
+        TransformMidi -- Returns self to allow chaining.
+        """
+        self.transforms.append((transform_fn, kwargs))
+        return self
+
+    def render(self) -> MidiFile:
+        """Apply all queued transformations to a copy of the original MIDI.
+
+        This method does not modify the original MIDI stored in `self.midi`.
+
+        Returns:
+        MidiFile -- The transformed copy of the original MIDI.
+        """
+        working_midi = deepcopy(self.midi)
+
+        for fn, kwargs in self.transforms:
+            working_midi = fn(working_midi, **kwargs)
+
+        return working_midi
 
 ###############################################################################
 def change_transposition(
     midi: MidiFile,
     semitones: int = 0,
-    min: int = 0,
-    max: int = 127
+    min_note: int = 0,
+    max_note: int = 127,
+    octave_shift: bool = False
 ) -> MidiFile:
     """Transpose all pitches in a MidiFile.
 
     Arguments:
-    midi (MidiFile) -- A mido MidiFile
+    midi (MidiFile) -- A mido MidiFile.
     semitones (int) -- Number of semitones to transpose.
 
     Returns:
-    MidiFile -- A transformed mido MidiFile
+    MidiFile -- A transformed mido MidiFile.
 
     """
-    def check_midiNo(note: int, min: int = 0, max: int = 127):
-        """Check if a MIDI number fits in a range.
+
+    def octave_wrap(note: int) -> int:
+        """If a note falls outside the range, transpose it an octave.
 
         Arguments:
         note (int) -- A MIDI number, the note to check
-        min (int) -- Minimum MIDI number allowed, usually the bottom limit of a sound font
-        max (int) -- Maximum MIDI number allowed, usually the bottom limit of a sound font
-
 
         Returns:
         int -- The valid octave shifted note
 
-        Not as relevant anymore.
         """
-        # Adjust the note until it's within the valid range.
-        while note < min or note > max:
-            if note > max:
-                note -= 12  # Adjust note by subtracting an octave.
-            elif note < min:
-                note += 12  # Adjust note by adding an octave.
+        while note < min_note or note > max_note:
+            if note > max_note:
+                note -= 12
+            elif note < min_note:
+                note += 12
+        return note
 
-        return note  # Return the valid note.
+    if midi.type != 0:
+        raise ValueError("change_ functions only support type 0 MidiFile objects.")
 
-    ############################################################################
-    # TODO: Add arg for only allowed note range.
+    # Setup new MidiFile.
     new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
-    track = MidiTrack()
-    new_midi.tracks.append(track)
-    for i in range(len(midi.tracks)):
-        for msg in midi.tracks[i]:
-            if msg.type in ["note_on", "note_off"]:
-                new_note = check_midiNo(
-                    msg.note + semitones, 
-                    min = min,
-                    max = max
-                )
-                track.append(msg.copy(note = new_note))
+    new_track = MidiTrack()
+    new_midi.tracks.append(new_track)
+
+    for msg in midi.tracks[0]:
+        if msg.type in ["note_on", "note_off"]:
+            new_note = msg.note + semitones
+
+            if octave_shift:
+                new_note = octave_wrap(new_note)
             else:
-                track.append(msg)   
+                if new_note < min_note or new_note > max_note:
+                    raise ValueError(
+                        f"Transposition pushes note {msg.note} -> {new_note} "
+                        f"outside valid range [{min_note},{max_note}]. "
+                        f"Set octave_shift=True to auto-wrap."
+                    )
+
+            new_track.append(msg.copy(note = new_note))
+        else:
+            new_track.append(msg.copy())
+
     return new_midi
 
 ###############################################################################
@@ -80,18 +135,22 @@ def change_articulation(
     midi: MidiFile,
     articulation: float = 0.75
 ) -> MidiFile:
-    """Change the 'on' duration of all note messages.
+    """Shorten note durations while preserving the original timeline.
 
     Arguments:
-    midi (MidiFile) -- A mido MidiFile
-    articulation (int) -- Articulation factor, a proportion of 1
+    midi (MidiFile) -- Input MIDI file.
+    articulation (float) -- Ratio to shorten note lengths (0 < articulation <= 1).
 
     Returns:
-    MidiFile -- A transformed mido MidiFile
-
+    MidiFile -- Transformed MIDI file.
     """
-    # TODO: ADD CHECK FOR > 0 < 1
-    new_midi = MidiFile(ticks_per_beat = midi.ticks_per_beat)
+    if midi.type != 0:
+        raise ValueError("change_ functions only support type 0 MidiFile objects.")
+
+    if not 0 < articulation <= 1:
+        raise ValueError("articulation must be between 0 and 1")
+
+    new_midi = MidiFile(ticks_per_beat=midi.ticks_per_beat, type=0)
 
     for track in midi.tracks:
         abs_time = 0
@@ -105,14 +164,11 @@ def change_articulation(
         new_events = []
 
         for time, msg in events:
-            if msg.type == 'note_on' and msg.velocity > 0:
+            if msg.type == "note_on" and msg.velocity > 0:
                 active_notes[(msg.channel, msg.note)] = time
                 new_events.append((time, msg))
 
-            elif (
-                msg.type == 'note_off'
-                or (msg.type == 'note_on' and msg.velocity == 0)
-            ):
+            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
                 key = (msg.channel, msg.note)
                 if key in active_notes:
                     start = active_notes.pop(key)
@@ -122,6 +178,7 @@ def change_articulation(
                     new_events.append((new_off_time, msg))
                 else:
                     new_events.append((time, msg))
+
             else:
                 new_events.append((time, msg))
 
@@ -153,31 +210,29 @@ def change_velocity(
     MidiFile -- A transformed mido MidiFile
 
     """
-    # TODO: Check values for 0-127
-    # Create a new MidiFile with the same ticks_per_beat.
-    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
-    track = MidiTrack()
-    new_midi.tracks.append(track)
+    if midi.type != 0:
+        raise ValueError("change_ functions only support type 0 MidiFile objects.")
 
-    # Iterate over each track and its messages.
-    for i in range(len(midi.tracks)):
-        for msg in midi.tracks[i]:
-            if msg.type == "note_on":
-                # Check if the current velocity is greater than 0 before changing.
-                if msg.velocity > 0:
-                    track.append(msg.copy(velocity = int(velocity)))  # Apply new velocity.
-                else:
-                    track.append(msg)  # Leave the message as is.
+    if not 0 <= velocity <= 127:
+        raise ValueError("velocity must be between 0 and 127")
+
+    # Create a new MidiFile.
+    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
+
+    for track in midi.tracks:
+        new_track = MidiTrack()
+        for msg in track:
+            if msg.type == "note_on" and msg.velocity > 0:
+                new_track.append(msg.copy(velocity = int(velocity)))
             else:
-                track.append(msg)  # Copy other messages as they are.
+                new_track.append(msg.copy()) # Copy other messages as they are.
+
+        new_midi.tracks.append(new_track)
 
     return new_midi
 
 ###############################################################################
-def change_tempo(
-    midi: MidiFile,
-    tempo: int = 500000
-) -> MidiFile:
+def change_tempo(midi: MidiFile, tempo: int = 500000) -> MidiFile:
     """ Change the tempo of an entire MidiFile.
 
     Arguments:
@@ -188,26 +243,31 @@ def change_tempo(
     MidiFile -- A transformed mido MidiFile
 
     """
-    # Create a new MidiFile with the same ticks_per_beat.
+
+    if midi.type != 0:
+        raise ValueError("change_ functions only support type 0 MidiFile objects.")
+
+    # Create a new MidiFile.
     new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
-    track = MidiTrack()
-    new_midi.tracks.append(track)
 
-    saw_tempo = False
+    for i, track in enumerate(midi.tracks):
+        new_track = MidiTrack()
+        saw_tempo = False
 
-    # Iterate over each track and its messages.
-    for i in range(len(midi.tracks)):
-        for msg in midi.tracks[i]:
+        for msg in track:
             if msg.type == "set_tempo":
-                # Replace tempo with the specified value.
-                track.append(msg.copy(tempo = tempo))
+                new_track.append(msg.copy(tempo = tempo))
                 saw_tempo = True
             else:
-                track.append(msg)  # Copy other messages as they are.
-    
-    if not saw_tempo:
-        track.insert(3, MetaMessage('set_tempo', tempo = tempo, time = 0))
+                new_track.append(msg.copy()) # Copy other messages as they are.
+
+        if i == 0 and not saw_tempo:
+            new_track.insert(
+                0,
+                MetaMessage('set_tempo', tempo = tempo, time = 0)
+            )
+
+        new_midi.tracks.append(new_track)
 
     return new_midi
-
 ###############################################################################
