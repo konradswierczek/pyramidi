@@ -21,7 +21,7 @@ def pcd(
     bites: list[Bite],
     weight_function = None,
     normalize = False
-):
+) -> dict:
     """Compute a pitch-class distribution with customizable weights.
 
     Arguments:

@@ -30,11 +30,18 @@ def pitch_salience(chord: Iterable[int], weights = 93):
     dict -- Pitch-salience analysis results with keys:
     'pitch_salience' (list[float]) : normalized salience values for pitch classes 0–11.
     'root_pc' (int | None) : estimated root pitch class, or None if ambiguous.
+    'root' (int | None) : MIDI number of root note, or None if ambiguous/not present.
     'ra' (float) : root ambiguity.
 
     """
     pcs = set(note % 12 for note in chord)
     pc_vector = [1 if i in pcs else 0 for i in range(12)]
+
+    # Root matcher to recover MIDI note from pitch class.
+    rootmatcher = {}
+    for note in chord:
+        pc = note % 12
+        rootmatcher.setdefault(pc, []).append(note)
 
     w = WEIGHTS88 if weights == 88 else WEIGHTS93
 
@@ -53,10 +60,12 @@ def pitch_salience(chord: Iterable[int], weights = 93):
     maxima = [i for i, v in enumerate(ps) if v == max(ps)]
 
     root_pc = maxima[0] if len(maxima) == 1 else None
+    root = rootmatcher[root_pc][0] if root_pc is not None else None
 
     return {
         "pitch_salience": ps,
         "root_pc": root_pc,
+        "root": root,
         "ra": ra
     }
 

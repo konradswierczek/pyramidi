@@ -33,6 +33,11 @@ Sapp, Craig Stuart.
 International Conference on Music Perception and Cognition (ICMPC 10);
     2008, Sapporo, Japan.
 
+Functions:
+- get_key_profiles
+- get_similarity_metrics
+- keyfinding
+- mirmode
 """
 
 ###############################################################################
@@ -137,7 +142,7 @@ SIMILARITY_METRICS = {
 }
 
 ###############################################################################
-def get_key_profiles():
+def get_key_profiles() -> set[str]:
     """Get the names of key-finding profiles available in this package.
 
     Arguments:
@@ -150,7 +155,7 @@ def get_key_profiles():
     return set(PROFILES)
 
 ###############################################################################
-def get_similarity_metrics():
+def get_similarity_metrics() -> set[str]:
     """Get the names of similarity metrics availble for Krumhansl keyfinding.
 
     Arguments:
@@ -167,7 +172,7 @@ def keyfinding(
     pitch_distribution: dict[int, float],
     key_profile: str = "KrumhanslKessler",
     similarity_metric: str = 'pearsonr'
-):
+) -> dict[str, float]:
     """Get key coefficients after Krumhansl 1990.
 
     Arguments:
@@ -207,7 +212,7 @@ def keyfinding(
 def mirmode(
     key_coefficients: dict[str, float],
     method: str = "best"
-):
+) -> float:
     """
 
     Arguments:
