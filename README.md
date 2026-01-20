@@ -13,6 +13,9 @@ from mido import MidiFile
 midi = MidiFile("a_midi_file.mid")
 ```
 
+> [!NOTE]
+> EVERYTHING ELSE IN THE USAGE SECTION IS OUT OF DATE FOR VERSION 2
+
 Generally speaking, this package is designed with type-0 MIDI files in mind. it's a good practice to first reformat your files.:
 ```
 from pyramidi import collapse_tracks
@@ -32,20 +35,15 @@ slices = slice_salami(midi)
 roots = [PitchSalience(chord[0]).root_pc for chord in slices]
 ```
 
-## Modules
-**Core:** Functions for pre-processing, cutting, and extracting basic properties.\
-**Analysis:** Functions for statistical analysis of MIDI files.\
-**Models:** Perceptual models for analyzing music.\
-**Score Defined Cues (sdc):** Automatic extraction after McMaster MAPLE Lab work.\
-**Manipulate:** Functions for altering specific properties in MIDI files.
-
 ## Dependencies
 This packages makes extensive use of Mido (https://github.com/mido/mido) to facilitate reading and writing MIDI files.
 
 ## Roadmap
-- Clean up models and analysis module
-    - Fix and supplement pcd (also move pcd to core module)
+- Clean up analysis.hutch78
+- Figure out a policy for imports
 - Measure-wise score defined cues
 - Add contribution guidelines
-- Revist CLI
-- Rework a generic class for transforming all available dimensions at once.
+- Add cutting for transform-midi cli
+- Add option to parse.cut_midi for start tick
+- Rework README to reflect new structure
+- Build more tests
