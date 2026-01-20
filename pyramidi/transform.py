@@ -6,6 +6,10 @@ Functions
 - change_articulation
 - change_velocity
 - change_tempo
+- change_tempi_ratio
+
+Classes
+- TransformMidi
 """
 
 ###############################################################################
@@ -16,7 +20,7 @@ from mido import MidiFile, MidiTrack, MetaMessage
 
 __all__ = [
     "change_transposition", "change_articulation", "change_velocity",
-    "change_tempo", "TransformMidi"
+    "change_tempo", "change_tempi_ratio", "TransformMidi"
 ]
 
 ###############################################################################
@@ -233,7 +237,7 @@ def change_velocity(
 
 ###############################################################################
 def change_tempo(midi: MidiFile, tempo: int = 500000) -> MidiFile:
-    """ Change the tempo of an entire MidiFile.
+    """Change the tempo of an entire MidiFile.
 
     Arguments:
     midi (MidiFile) -- A mido MidiFile
@@ -270,4 +274,56 @@ def change_tempo(midi: MidiFile, tempo: int = 500000) -> MidiFile:
         new_midi.tracks.append(new_track)
 
     return new_midi
+
 ###############################################################################
+def change_tempi_ratio(midi: MidiFile, ratio: float) -> MidiFile:
+    """Change the tempi of an entire MidiFile as a ratio of the existing tempi.
+
+    Arguments:
+    midi (MidiFile) -- A mido MidiFile
+    ratio (float) -- A ratio to multiply existing tempi by.
+
+    Returns:
+    MidiFile -- A transformed mido MidiFile
+    """
+
+    def tempo_from_ratio(tempo: int, ratio: float) -> int:
+        """
+        Scale a MIDI tempo (microseconds per quarter note) by a ratio.
+
+        Notes:
+        - ratio > 1.0 → slower tempo (more microseconds per beat)
+        - ratio < 1.0 → faster tempo (fewer microseconds per beat)
+        """
+        if ratio <= 0:
+            raise ValueError("ratio must be > 0")
+
+        return int(tempo / ratio)
+
+    if midi.type != 0:
+        raise ValueError("change_ functions only support type 0 MidiFile objects.")
+
+    # Track whether we saw any tempo events.
+    saw_tempo = False
+
+    # Create a new MidiFile.
+    new_midi = MidiFile(type = 0, ticks_per_beat = midi.ticks_per_beat)
+
+    for track in midi.tracks:
+        new_track = MidiTrack()
+
+        for msg in track:
+            if msg.type == "set_tempo":
+                saw_tempo = True
+                new_tempo = tempo_from_ratio(msg.tempo, ratio)
+                new_track.append(msg.copy(tempo = new_tempo))
+            else:
+                new_track.append(msg.copy())
+
+        new_midi.tracks.append(new_track)
+
+    if not saw_tempo:
+        raise ValueError("No tempo events found in MIDI file. Cannot scale tempo.")
+
+    return new_midi
+
