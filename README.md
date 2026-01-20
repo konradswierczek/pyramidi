@@ -47,3 +47,4 @@ This packages makes extensive use of Mido (https://github.com/mido/mido) to faci
 - Add option to parse.cut_midi for start tick
 - Rework README to reflect new structure
 - Build more tests
+- Consider adding existing sythesis tools to this package: one stop shop for all our transformations
