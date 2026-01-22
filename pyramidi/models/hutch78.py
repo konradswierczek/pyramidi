@@ -18,14 +18,16 @@ from math import *
 from itertools import combinations
 import numpy
 
-###############################################################################
 __all__ = []
+
+###############################################################################
 CBWA = 1.72
 CBWB = 0.65
 CBWCUTOFF = 1.2
 A = 0.25
 B = 2
 partials = 10
+
 ###############################################################################
 def roughnessDyad(dyad, rolloff = 1, partials = 11):
     """ DOC STRING GOES HERE IN A FUNCTION
