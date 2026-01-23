@@ -17,7 +17,7 @@ from shutil import move
 from subprocess import run, DEVNULL
 from tempfile import NamedTemporaryFile
 
-__all__ = ["render_audio", "render_reverb", "render_compression", "SpecifySoundfont", "RenderAudio"]
+__all__ = ["render_audio", "render_reverb", "render_compression", "render_loudness_ebur128", "SpecifySoundfont", "RenderAudio"]
 
 # =========================================================================== #
 def prepare_tempfile(output_path: str = None, suffix: str = ".wav") -> str:
@@ -55,6 +55,7 @@ def render_audio(
     midi_file (str) -- Path to the input MIDI file.
     soundfont (str) -- Path to the soundfont file.
     output_path (str, optional): Path to the output audio file. Defaults to a temporary file.
+    silent (bool) -- Should standard output of fluidsynth print?
 
     Returns:
     str: The file path of the generated audio file.
@@ -89,6 +90,19 @@ def render_reverb(
     wet: float = 4.0,
     silent: bool = False
 ) -> str:
+    """Apply reverb from an IR file using ffmpeg.
+
+    Arguments:
+    audio_file (str) -- Path to the input audio file.
+    output_path (str) -- Path to store the compressed file. If None, a temporary path is created and returned.
+    dry (float) --
+    wet (float) --
+    silent (bool) -- Should standard output of ffmpeg print?
+
+    Returns
+    str -- Path to the compressed file.
+    """
+    # TODO: Complete docs.
 
     kwargs = {}
     if silent:
@@ -128,10 +142,11 @@ def render_compression(
 
     Arguments:
     audio_file (str) -- Path to the input audio file.
-    output_path (str --) Path to store the compressed file. If None, a temporary path is created and returned.
+    output_path (str) -- Path to store the compressed file. If None, a temporary path is created and returned.
     sr (int) -- Sample rate for compression (optional, e.g., 22050 or 44100 Hz).
     cbr_bitrate (int) -- Bitrate for CBR compression (optional, e.g., 128 for 128kbps).
     vbr_quality (int) -- Quality setting for VBR compression (optional, e.g., 2 for high quality, 6 for lower quality).
+    silent (bool) -- Should standard output of ffmpeg print?
 
     Returns
     str -- Path to the compressed file.
@@ -168,6 +183,51 @@ def render_compression(
             command.extend(['-ar', str(sr)])
         command.append(output_path)
         run(command, check=True, **kwargs)
+
+    return output_path
+
+# =========================================================================== #
+def render_loudness_ebur128(
+    audio_file: str,
+    output_path: str = None,
+    target_lufs: float = -14,
+    lra: float = 11,
+    tp: float = -2,
+    silent: bool = False
+) -> str:
+    """Normalize true peak loudness of an audio file according to EBU R128.
+
+    Arguments:
+    audio_file (str) -- Path to the input audio file.
+    output_path (str) -- Path to store the compressed file. If None, a temporary path is created and returned.
+    target_lufs (float) -- Target loudness in Loudness Units Full Scale.
+    lra (float) -- .
+    tp (float) -- Set maximum true peak. Range is -9.0 - +0.0. Default value is -2.0. 
+    silent (bool) -- Should standard output of ffmpeg print?
+
+    Returns
+    str -- Path to the normalized file.
+    """
+    # TODO: Would be nice to have extension based on previous files encoding.
+
+    kwargs = {}
+    if silent:
+        kwargs["stdout"] = DEVNULL
+        kwargs["stderr"] = DEVNULL
+
+    output_path = prepare_tempfile(output_path, ".wav")
+
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i", audio_file,
+            "-af", f"loudnorm=I={target_lufs}:TP={tp}:LRA={lra}",
+            output_path,
+        ],
+        check=True,
+        **kwargs,
+    )
 
     return output_path
 
