@@ -1,5 +1,5 @@
 # PYraMIDI
-A package for processing, manipulating, and analyzing MIDI files using Mido. Primarily designed and tested on MIDI representations of keyboard music.
+A package for processing, manipulating, and analyzing MIDI files using Mido. Primarily designed and tested on MIDI representations of keyboard music. Similar to other tools, most notably the incredibly useful music21, but largely created for some niche work in the Digital Music Lab and the Music Acoustics Perceptual and LEarning Lab at McMaster University. Also notably a way for me to get a bit more comfortable with turning MIDI data into meaningful musical representations.
 
 Install with pip:
 ``` python

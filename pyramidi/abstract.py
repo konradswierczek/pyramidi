@@ -10,14 +10,15 @@ Functions:
 # Built-in Imports
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Literal
 # Third Party Imports
 from mido import MidiFile
 
-__all__ = ["slice_salami", "slice_bites"]
+__all__ = ["slice_salami", "slice_bites", "segment_measures", "segment_beats"]
 
 ###############################################################################
 @dataclass
+# NOTE: A flaw here is that the time signature AND possibly tempo doesn't necessarily hold true through an entire event...
 class TimedEvent:
     tempo: int
     ticks_per_beat: int
@@ -202,5 +203,72 @@ def slice_bites(midi: MidiFile) -> list[Bite]:
 
     note_events.sort(key = lambda n: n.start)
     return note_events
+
+###############################################################################
+@dataclass
+class Segment:
+    level: Literal["beat", "measure"]
+    index: int
+    start: int
+    duration: int
+    slices: list["Slice"]
+
+###############################################################################
+def segment_measures(slices: list[Slice]) -> list[Segment]:
+    # NOTE: CANNOT HANDLE ANACRUSIS
+    ts_num, _ = slices[0].time_signature
+    tpq = slices[0].ticks_per_beat
+    slice_ticks = slices[0].duration
+
+    slices_per_beat = tpq // slice_ticks
+    slices_per_measure = ts_num * slices_per_beat
+
+    segments = []
+    for i in range(0, len(slices), slices_per_measure):
+        group = slices[i:i + slices_per_measure]
+        if not group:
+            continue
+
+        measure_idx = i // slices_per_measure
+        start = group[0].start
+        duration = sum(sl.duration for sl in group)
+
+        segments.append(
+            Segment(
+                level="measure",
+                index=measure_idx,
+                start=start,
+                duration=duration,
+                slices=group
+            )
+        )
+
+    return segments
+
+###############################################################################
+def segment_beats(slices: list[Slice]) -> list[Segment]:
+    # NOTE: Technically this segements by equivilant quarter note, which isn't really in the spirit.
+    tpb = slices[0].ticks_per_beat
+
+    beats = {}
+    for sl in slices:
+        beat_idx = sl.start // tpb
+        beats.setdefault(beat_idx, []).append(sl)
+
+    segments = []
+    for idx, group in sorted(beats.items()):
+        start = group[0].start
+        duration = sum(sl.duration for sl in group)
+        segments.append(
+            Segment(
+                level="beat",
+                index=idx,
+                start=start,
+                duration=duration,
+                slices=group
+            )
+        )
+
+    return segments
 
 ###############################################################################

@@ -44,26 +44,32 @@ def arScore(slices: list[Slice]) -> float:
 
     """
     return len(slices) / tick2second(
-        slices[-1].end,
+        sum([i.duration for i in slices]),
         slices[-1].ticks_per_beat,
         slices[-1].tempo
     )
 
 ###############################################################################
-def pitchHeight(bites: list[Bite]):
+def pitchHeight(slices: list[Slice]):
     """Calculate the weighted keyboard number pitch height.
 
     Arguments:
-    slices (list[Bite]) -- A list of Slice objects returned by slice_bites.
+    slices (list[Slice]) -- A list of Slice objects returned by slice_salami.
 
     Returns:
     float -- Weighted average pitch height
 
     """
-    full_duration = sum([i.duration_seconds for i in bites])
-    pitch_height = sum(
-        [i.keynum * i.duration_seconds for i in bites]
-    ) / full_duration
-    return pitch_height
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for ev in slices:
+        dur = ev.duration_seconds
+        keynums = ev.keynum
+
+        for k in keynums:
+            weighted_sum += k * dur
+            total_weight += dur
+
+    return weighted_sum / total_weight
 
 ###############################################################################
