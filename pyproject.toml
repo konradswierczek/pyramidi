@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyramidi"
-version = "2.0.0.9976"
+version = "2.0.0.9975"
 authors = [
   { name="Konrad Swierczek", email="swierckj@mcmaster.ca" },
 ]
@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [project.scripts]
-transform-midi = "pyramidi.cli.transform:main"
+change-midi = "pyramidi.cli.change:main"
 
 [project.urls]
 Homepage = "https://github.com/konradswierczek/pyramidi"

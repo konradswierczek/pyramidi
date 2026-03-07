@@ -1,26 +1,39 @@
 """
-A CLI tool for transforming MIID files.s
+A CLI tool for altering MIDI files.
+
+Example:
+
+change-midi -i in.mid -o out.mid \
+  -a SetVelocity:velocity=100 \
+  -a TransformTempo:tempo_ratio=1.25 \
+  -a TransformPitch:amount=2
 """
-# TODO: Add option for cutting MIDI beforehand.
 
 ###############################################################################
 # Built-in Imports
 import inspect
 from argparse import ArgumentParser
-# Third Party Imports
-from mido import MidiFile
+
 # Local Imports
-from pyramidi.parse import collapse_tracks, cut_midi
-from pyramidi.transform import *
+from pyramidi import PyraMIDIFile
+from pyramidi.change import *
+from pyramidi.change import ChangeMIDI
 
 ###############################################################################
-def discover_transforms():
-    """Discover available transform functions by name."""
-    transforms = {}
-    for name, obj in globals().items():
-        if callable(obj) and name.startswith("change_"):
-            transforms[name] = obj
-    return transforms
+def discover_changes():
+    """Discover all subclasses of ChangeMIDI."""
+    return {cls.__name__: cls for cls in ChangeMIDI.__subclasses__()}
+
+def parse_apply_spec(spec: str):
+    """Parse TRANSFORM[:arg=value,...]"""
+    if ":" in spec:
+        name, argstr = spec.split(":", 1)
+        kwargs = parse_kwargs(argstr)
+    else:
+        name = spec
+        kwargs = {}
+
+    return name, kwargs
 
 ###############################################################################
 def parse_kwargs(argstr: str) -> dict:
@@ -49,7 +62,7 @@ def main():
 
     parser.add_argument(
         "-i", "--input-file",
-        help = "Input MIDI file (type 0 assumed)."
+        help = "Input MIDI file."
     )
 
     parser.add_argument(
@@ -74,36 +87,51 @@ def main():
     args = parser.parse_args()
 
     # Process apply arguments into transforms.
-    transforms = discover_transforms()
+    change_classes = discover_changes()
     if args.list_transforms:
-        print("Available transformations:")
-        for name in sorted(transforms):
-            fn = transforms[name]
-            sig = inspect.signature(fn)
-            print(f"    {name}{sig}")
+
+        print("Available Changes:\n")
+
+        for name, cls in discover_changes().items():
+
+            sig = inspect.signature(cls.__init__)
+            params = [
+                str(p) for p in sig.parameters.values()
+                if p.name != "self"
+            ]
+
+            print(f"{name}({', '.join(params)})")
+
         return
 
     # Load MIDI.
-    midi = MidiFile(args.input_file)
-    midi = collapse_tracks(midi)
-    pipeline = TransformMidi(midi)
+    # TODO: Check if MIDI is type 0 and exit if yes
+    midi = PyraMIDIFile(args.input_file)
+    change_vector = []
 
-    # Build pipeline.
-    for step in args.apply:
-        if ":" in step:
-            name, argstr = step.split(":", 1)
-            kwargs = parse_kwargs(argstr)
-        else:
-            name = step
-            kwargs = {}
+    for spec in args.apply:
 
-        if name not in transforms:
-            raise ValueError(f"Unknown transform: {name}")
+        name, kwargs = parse_apply_spec(spec)
 
-        pipeline.add(transforms[name], **kwargs)
+        if name not in change_classes:
+            raise ValueError(
+                f"Unknown transform '{name}'. "
+                f"Use --list-transforms to see available options."
+            )
+
+        cls = change_classes[name]
+
+        try:
+            change = cls(**kwargs)
+        except TypeError as e:
+            raise ValueError(
+                f"Invalid arguments for {name}: {kwargs}"
+            ) from e
+
+        change_vector.append(change)
 
     # Render and save.
-    result = pipeline.render()
+    result = change_midi(change_vector, midi)
     result.save(args.output_file)
 
 ###############################################################################
