@@ -24,6 +24,7 @@ Workflow:
     new_midi = change_midi(transformation_vector, midi)
     print(new_midi)
 """
+# TODO: Arrange arguments so can take MidiFile as input instead of filepath.
 
 ###############################################################################
 # Standard Library
@@ -36,7 +37,6 @@ from mido import MidiFile, MidiTrack, Message
 
 # Local
 from .parse import collapse_tracks, cut_midi, get_ticks_mm
-from .transform import change_transposition, change_velocity, change_tempi_ratio, change_articulation
 from .abstract import Slice, slice_salami
 
 ###############################################################################
@@ -157,4 +157,3 @@ class PyraMIDIFile:
 
     def __str__(self) -> str:
         return self.__repr__()
-
