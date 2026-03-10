@@ -1,7 +1,7 @@
 """
 Procedurally change `PyraMIDIFile` objects.
 
-Change individual aspects of a MIDI file, or create a pipeline to change multiple aspects. Classes prefaced with `Set` overwrite existing values, while those prefaced with `Transform` take the current values and alter them by adding, multiplying, etc. Use `change_midi`
+Change individual aspects of a MIDI file, or create a pipeline to change multiple aspects. Classes prefaced with `Set` overwrite existing values, while those prefaced with `Transform` take the current values and alter them by adding, multiplying, etc.
 
 Change Classes:
     - `SetVelocity`

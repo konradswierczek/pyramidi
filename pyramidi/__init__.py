@@ -1,9 +1,3 @@
-from .pyramidi import (
-    PyraMIDIFile,
-    # TransformationFunction,
-    # SetVelocity,
-    # TransformTempo,
-    # SetArticulation,
-    # SetTransposition,
-    # change_midi,
-)
+from .pyramidi import *
+from .audio import *
+from .change import *

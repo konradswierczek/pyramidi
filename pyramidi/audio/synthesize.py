@@ -1,4 +1,45 @@
 """
+Render `PyraMIDIFile` objects to audio.
+
+This module provides tools for synthesizing MIDI data into audio files using
+FluidSynth. It converts a `PyraMIDIFile` into a temporary MIDI file and renders
+it to audio using a specified SoundFont.
+
+Rendering is useful when evaluating MIDI transformations, generating audio
+datasets, or preparing stimuli for perceptual experiments.
+
+Classes:
+- `SynthesizeAudio`  
+    Render a `PyraMIDIFile` to audio using FluidSynth.
+
+Example:
+    ```
+    from pyramidi import (
+        PyraMIDIFile,
+        SynthesizeAudio,
+        ApplyCompression,
+        NormalizeLoudness,
+        change_audio
+    )
+    from os import remove
+
+    midi = PyraMIDIFile("tests/test.mid")
+    renderer = SynthesizeAudio()
+
+    wav = renderer.render(midi)
+    ```
+
+Notes:
+FluidSynth must be installed and available on the system path.
+
+Install with:
+
+    Ubuntu: sudo apt install fluidsynth  
+    Mac:    brew install fluidsynth  
+    Conda:  conda install -c conda-forge fluidsynth
+
+SoundFonts (`.sf2` files) define the instrument timbres used during synthesis.
+If no SoundFont is specified, FluidSynth will attempt to use its system default.
 """
 # TODO: Add other fluidsynth params
 
@@ -106,17 +147,13 @@ class SynthesizeAudio:
             "-R", "off",
         ])
 
-        run(
-            cmd,
-            check=True,
-            **kwargs
-        )
-
         try:
             run(cmd, check=True, **kwargs)
         finally:
             # Clean up temporary MIDI file.
             remove(midi_path)
+        
+        return output_path
 
     def to_spec(self):
         """Specify the generation.

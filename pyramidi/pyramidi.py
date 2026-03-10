@@ -39,6 +39,8 @@ from mido import MidiFile, MidiTrack, Message
 from .parse import collapse_tracks, cut_midi, get_ticks_mm
 from .abstract import Slice, slice_salami
 
+__all__ = ["PyraMIDIFile"]
+
 ###############################################################################
 # 1. PyraMIDIFile
 ###############################################################################
