@@ -37,7 +37,9 @@ Use Abstract Class `ChangeMIDI` to create new changes.
 # =========================================================================== #
 # Built-in Imports.
 from abc import ABC, abstractmethod
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Type
+import json
+import hashlib
 
 # Third Party Imports.
 from mido import MidiFile, MidiTrack, MetaMessage
@@ -52,8 +54,15 @@ __all__ = [
     "TransformArticulation",
     "TransformTempo",
     "SetTempo",
-    "change_midi"
+    "ChangeMIDIPipeline",
+    "changes_from_spec"
 ]
+
+_CHANGE_REGISTRY = {}
+
+def register_change(cls):
+    _CHANGE_REGISTRY[cls.__name__] = cls
+    return cls
 
 # =========================================================================== #
 class ChangeMIDI(ABC):
@@ -96,21 +105,7 @@ def _new_midi_like(midi: PyraMIDIFile) -> MidiFile:
     return MidiFile(type=midi.type, ticks_per_beat=midi.ticks_per_beat)
 
 # =========================================================================== #
-def change_midi(
-    change_vector: List[ChangeMIDI],
-    midi: PyraMIDIFile
-):
-    """Perform a pipeline of ChangeMIDI to PyraMIDIFile."""
-    transformed_midi = midi
-
-    for transformation in change_vector:
-        if not isinstance(transformation, ChangeMIDI):
-            raise TypeError("All elements of change_vector must be ChangeMIDI objects")
-        transformed_midi = transformation(transformed_midi)
-
-    return transformed_midi
-
-# =========================================================================== #
+@register_change
 class SetVelocity(ChangeMIDI):
     """Overwrite the velocity of all note_on > 1 with one value."""
     def __init__(self, velocity: int = 64):
@@ -141,7 +136,7 @@ class SetVelocity(ChangeMIDI):
 
             transformed_midi.tracks.append(new_track)
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
@@ -150,6 +145,7 @@ class SetVelocity(ChangeMIDI):
         }
 
 # =========================================================================== #
+@register_change
 class TransformVelocity(ChangeMIDI):
     """Change the velocity of all note on > 0 functionally."""
     def __init__(self, amount: int = 0, method: str = "add"):
@@ -205,7 +201,7 @@ class TransformVelocity(ChangeMIDI):
 
             transformed_midi.tracks.append(new_track)
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
@@ -215,6 +211,7 @@ class TransformVelocity(ChangeMIDI):
         }
 
 # =========================================================================== #
+@register_change
 class TransformPitch(ChangeMIDI):
     """Change the note of all events functionally."""
     def __init__(
@@ -311,7 +308,7 @@ class TransformPitch(ChangeMIDI):
             else:
                 new_track.append(msg.copy())
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
@@ -324,6 +321,7 @@ class TransformPitch(ChangeMIDI):
         }
 
 # =========================================================================== #
+@register_change
 class TransformArticulation(ChangeMIDI):
     """Change the duration of all notes without altering the rhythmic structure."""
     # TODO: Looks like there is a lower limit to this. Worth knowing what it is... Maybe software dependant?
@@ -397,7 +395,7 @@ class TransformArticulation(ChangeMIDI):
 
             transformed_midi.tracks.append(new_track)
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
@@ -406,6 +404,7 @@ class TransformArticulation(ChangeMIDI):
         }
 
 # =========================================================================== #
+@register_change
 class TransformTempo(ChangeMIDI):
     """Change the tempo functionally."""
     def __init__(self, tempo_ratio: float = 1):
@@ -447,7 +446,7 @@ class TransformTempo(ChangeMIDI):
         if not saw_tempo:
             raise ValueError("No tempo events found in MIDI file. Cannot scale tempo.")
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
@@ -456,6 +455,7 @@ class TransformTempo(ChangeMIDI):
         }
 
 # =========================================================================== #
+@register_change
 class SetTempo(ChangeMIDI):
     """Overwrite all tempi with a constant."""
     def __init__(self, tempo: int):
@@ -496,12 +496,62 @@ class SetTempo(ChangeMIDI):
 
             transformed_midi.tracks.append(new_track)
 
-        return transformed_midi
+        return PyraMIDIFile(midi = transformed_midi)
 
     def to_spec(self):
         return {
             "type": self.__class__.__name__,
             "tempo": self.tempo
         }
+
+# =========================================================================== #
+class ChangeMIDIPipeline:
+    def __init__(self, changes: List[ChangeMIDI]):
+        for c in changes:
+            if not isinstance(c, ChangeMIDI):
+                raise TypeError("All elements must be ChangeMIDI")
+        self.changes = changes
+
+    def apply(self, midi: PyraMIDIFile) -> PyraMIDIFile:
+        result = midi
+        for change in self.changes:
+            result = change(result)
+        return result
+
+    __call__ = apply
+
+    def to_spec(self):
+        return [c.to_spec() for c in self.changes]
+
+    def identify(self) -> str:
+        spec = self.to_spec()
+        spec_json = json.dumps(spec, sort_keys=True)
+        return hashlib.sha256(spec_json.encode()).hexdigest()  # full 64 hex chars
+
+# =========================================================================== #
+def changes_from_spec(
+    spec: List[Dict[str, Any]],
+) -> List[ChangeMIDI]:
+    """
+    Reconstruct a change_vector from a to_spec() output.
+    Arguments:
+        spec: List of change specifications (from to_spec)
+    Returns:
+        List[ChangeMIDI]
+    """
+    changes = []
+    for item in spec:
+        if "type" not in item:
+            raise ValueError(f"Missing 'type' in spec item: {item}")
+        type_name = item["type"]
+        if type_name not in _CHANGE_REGISTRY:
+            raise ValueError(f"Unknown ChangeMIDI type: {type_name}")
+        cls = _CHANGE_REGISTRY[type_name]
+
+        # Remove "type" and pass the rest to constructor
+        kwargs = {k: v for k, v in item.items() if k != "type"}
+        changes.append(cls(**kwargs))
+
+    return changes
 
 # =========================================================================== #

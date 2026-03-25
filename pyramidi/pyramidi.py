@@ -24,9 +24,7 @@ Workflow:
     new_midi = change_midi(transformation_vector, midi)
     print(new_midi)
 """
-# TODO: Arrange arguments so can take MidiFile as input instead of filepath.
-
-###############################################################################
+# =========================================================================== #
 # Standard Library
 from abc import ABC, abstractmethod
 from typing import Optional, List
@@ -37,14 +35,11 @@ from mido import MidiFile, MidiTrack, Message
 
 # Local
 from .parse import collapse_tracks, cut_midi, get_ticks_mm
-from .abstract import Slice, slice_salami
+from pyramidi.abstractions.registry import ABSTRACTION_REGISTRY
 
 __all__ = ["PyraMIDIFile"]
 
-###############################################################################
-# 1. PyraMIDIFile
-###############################################################################
-
+# =========================================================================== #
 class PyraMIDIFile:
     """
     Main MIDI file class for pyramidi.
@@ -52,40 +47,53 @@ class PyraMIDIFile:
     Wraps mido.MidiFile with preprocessing and analysis capabilities.
 
     Args:
-        filepath:     Path to MIDI file.
+        filepath:     Path to MIDI file. Mutually exclusive with `midi`.
+        midi:         A pre-existing mido.MidiFile object. Mutually exclusive with `filepath`.
         collapse:     Merge all tracks into a single Type 0 track. Default: True.
         cut_measures: Truncate to this many measures. Default: None (no cut).
 
     Example:
-        >>> import pyramidi
-        >>> midi = pyramidi.PyraMIDIFile("song.mid")
+        >>> midi = PyraMIDIFile("song.mid")
         >>> print(midi)
         PyraMIDIFile(tracks=1, ticks_per_beat=480, type=0)
+
+        >>> import mido
+        >>> raw = mido.MidiFile("song.mid")
+        >>> midi = PyraMIDIFile(midi=raw)
+        >>> print(midi)
+        PyraMIDIFile(tracks=3, ticks_per_beat=480, type=1)
     """
 
     def __init__(
         self,
         filepath: Optional[str] = None,
+        midi: Optional[MidiFile] = None,
         collapse: bool = True,
         cut_measures: Optional[int] = None,
     ):
+        if filepath is not None and midi is not None:
+            raise ValueError("Specify either 'filepath' or 'midi', not both.")
+
         self.filepath = Path(filepath) if filepath else None
         self.midi: Optional[MidiFile] = None
 
-        if filepath:
+        if filepath is not None:
             self.midi = MidiFile(str(filepath))
+        elif midi is not None:
+            self.midi = midi
+        else:
+            self.midi = MidiFile(type=0, ticks_per_beat=480)
+
+        if self.midi is not None:
             if collapse:
                 self.midi = collapse_tracks(self.midi)
             if cut_measures is not None:
                 cut_tick = get_ticks_mm(self.midi, n_measures=cut_measures)
                 self.midi = cut_midi(self.midi, cut_tick)
-        else:
-            self.midi = MidiFile(type=0, ticks_per_beat=480)
 
-    # -------------------------------------------------------------------------
-    # File I/O
-    # -------------------------------------------------------------------------
+        self._abstractions = {}
 
+    # ======================================================================= #
     def save(self, filepath: Optional[str] = None) -> "PyraMIDIFile":
         """Save MIDI to disk. Uses original filepath if none provided."""
         if filepath is None:
@@ -106,9 +114,8 @@ class PyraMIDIFile:
             new.midi.tracks.append(new_track)
         return new
 
-    # -------------------------------------------------------------------------
+    # ======================================================================= #
     # Delegated mido.MidiFile properties
-    # -------------------------------------------------------------------------
 
     @property
     def tracks(self):
@@ -127,26 +134,40 @@ class PyraMIDIFile:
         """Duration in seconds."""
         return self.midi.length
 
-    # -------------------------------------------------------------------------
-    # Analysis methods
-    # -------------------------------------------------------------------------
+    # ======================================================================= #
+    # Abstractions
+    def to_abstraction(self, name, force=False):
+        """Convert to a registered abstraction."""
 
-    def get_salami_slices(self) -> list[Slice]:
-        """
-        Return vertical (chordal) slices of the MIDI file.
+        if not force and name in self._abstractions:
+            return self._abstractions[name]
 
-        Delegates to abstract.slice_salami. Each Slice carries timing context
-        (tempo, ticks_per_beat, time_signature) alongside its notes.
+        if name not in ABSTRACTION_REGISTRY:
+            raise ValueError(f"Unknown abstraction: {name}")
 
-        Returns:
-            list[Slice] -- one Slice per unique vertical sonority.
-        """
-        return slice_salami(self.midi)
+        cls = ABSTRACTION_REGISTRY[name]
 
-    # -------------------------------------------------------------------------
+        abstraction = cls(self)
+
+        self._abstractions[name] = abstraction
+
+        return abstraction
+
+    def __getattr__(self, name):
+
+        if name in ABSTRACTION_REGISTRY:
+
+            def wrapper(force=False):
+                return self.to_abstraction(name, force=force)
+
+            return wrapper
+
+        raise AttributeError(
+            f"{self.__class__.__name__} has no attribute '{name}'"
+        )
+
+    # ======================================================================= #
     # Dunder methods
-    # -------------------------------------------------------------------------
-
     def __repr__(self) -> str:
         if self.midi is None:
             return "PyraMIDIFile(empty)"
@@ -159,3 +180,5 @@ class PyraMIDIFile:
 
     def __str__(self) -> str:
         return self.__repr__()
+
+# =========================================================================== #

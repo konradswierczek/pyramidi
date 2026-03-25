@@ -41,7 +41,6 @@ This packages makes extensive use of Mido (https://github.com/mido/mido) to faci
 ## Roadmap
 - Clean up analysis.hutch78
 - Adapt change module framework to synthesis
-- Add synthesis cli tool (end to end with change or just standalone or both?)
 - Intergate abstractions into PyraMIDIFile
 
 - Figure out a policy for imports
@@ -51,3 +50,5 @@ This packages makes extensive use of Mido (https://github.com/mido/mido) to faci
 - Add option to parse.cut_midi for start tick
 - Rework README to reflect new structure
 - Build more tests
+
+- Add change_audio cli or midi-audio cli?
