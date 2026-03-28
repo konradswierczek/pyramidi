@@ -44,7 +44,14 @@ class MIDI2Audio:
 
         self.changes = changes
 
-    def apply(self, midi: PyraMIDIFile):
+    def apply(self, midi: PyraMIDIFile, output_path: str | None = None):
+        """
+        Apply the pipeline to a PyraMIDIFile and render to audio.
+
+        Arguments:
+        midi (PyraMIDIFile) -- The MIDI object to transform and render.
+        output_path (str | None) -- Path to save the final audio file. If None, a temporary file is used.
+        """
         audio_file = None
 
         for change in self.changes:
@@ -53,9 +60,10 @@ class MIDI2Audio:
                 print(type(midi))
 
             elif isinstance(change, SynthesizeAudio):
-                audio_file = change.render(midi)
+                # Pass the output_path only to the SynthesizeAudio step.
+                audio_file = change.render(midi, output_path=output_path)
 
-        # Apply all audio changes using managed pipeline
+        # Apply all audio changes using managed pipeline.
         audio_changes = [c for c in self.changes if isinstance(c, ChangeAudio)]
         if audio_changes:
             audio_file = change_audio(audio_changes, audio_file)
