@@ -98,6 +98,16 @@ class ChangeMIDI(ABC):
         Dict[str, Any] -- A dictionary of all information needed to reproduce an instance of the Change class, including the class name.
         """
 
+    @abstractmethod
+    def label(self) -> str:
+        """A short human-readable label for this change.
+        
+        Used to construct filenames. Should be brief and descriptive enough
+        to identify the change at a glance — full reproduction is handled
+        by to_spec().
+        
+        Examples: 'pitch+2', 'vel64', 'tempo0.95'
+        """
 
 # =========================================================================== #
 def _new_midi_like(midi: PyraMIDIFile) -> MidiFile:
@@ -144,7 +154,11 @@ class SetVelocity(ChangeMIDI):
             "velocity": self.velocity
         }
 
+    def label(self) -> str:
+        return f"vel{self.velocity}"
+
 # =========================================================================== #
+# TODO: Something seems wrong here...
 @register_change
 class TransformVelocity(ChangeMIDI):
     """Change the velocity of all note on > 0 functionally."""
@@ -209,6 +223,10 @@ class TransformVelocity(ChangeMIDI):
             "amount": self.amount,
             "method": self.method
         }
+
+    def label(self) -> str:
+        direction = "p" if self.amount >= 0 else "m"
+        return f"velx{direction}{abs(self.amount)}"
 
 # =========================================================================== #
 @register_change
@@ -320,6 +338,10 @@ class TransformPitch(ChangeMIDI):
             "octave_shift": self.octave_shift
         }
 
+    def label(self) -> str:
+        direction = "p" if self.amount >= 0 else "m"
+        return f"pitch{direction}{abs(self.amount)}"
+
 # =========================================================================== #
 @register_change
 class TransformArticulation(ChangeMIDI):
@@ -403,6 +425,10 @@ class TransformArticulation(ChangeMIDI):
             "articulation": self.articulation
         }
 
+    def label(self) -> str:
+        val = f"{round(self.articulation, 2)}".replace(".", "p")
+        return f"arti{val}"
+
 # =========================================================================== #
 @register_change
 class TransformTempo(ChangeMIDI):
@@ -454,6 +480,10 @@ class TransformTempo(ChangeMIDI):
             "tempo_ratio": self.tempo_ratio
         }
 
+    def label(self) -> str:
+        val = f"{round(self.tempo_ratio, 2)}".replace(".", "p")
+        return f"tempo{val}"
+
 # =========================================================================== #
 @register_change
 class SetTempo(ChangeMIDI):
@@ -503,6 +533,9 @@ class SetTempo(ChangeMIDI):
             "type": self.__class__.__name__,
             "tempo": self.tempo
         }
+
+    def label(self) -> str:
+        return f"mspqn{self.tempo}"
 
 # =========================================================================== #
 class ChangeMIDIPipeline:

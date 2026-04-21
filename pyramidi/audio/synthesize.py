@@ -44,6 +44,7 @@ If no SoundFont is specified, FluidSynth will attempt to use its system default.
 # TODO: Add other fluidsynth params
 
 # =========================================================================== #
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from subprocess import run, DEVNULL
 from os.path import exists
@@ -165,5 +166,10 @@ class SynthesizeAudio:
             "type": self.__class__.__name__,
             "soundfont": self.soundfont
         }
+
+    def label(self) -> str:
+        if self.soundfont is None:
+            return "sf(default)"
+        return f"sf({Path(self.soundfont).stem})"
 
 # =========================================================================== #
