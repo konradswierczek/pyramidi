@@ -35,7 +35,7 @@ from mido import MidiFile, MidiTrack, Message
 
 # Local
 from .parse import collapse_tracks, cut_midi, get_ticks_mm
-from pyramidi.abstractions.registry import ABSTRACTION_REGISTRY
+#from pyramidi.abstractions.registry import ABSTRACTION_REGISTRY
 
 __all__ = ["PyraMIDIFile"]
 
@@ -135,36 +135,7 @@ class PyraMIDIFile:
         return self.midi.length
 
     # ======================================================================= #
-    # Abstractions
-    def to_abstraction(self, name, force=False):
-        """Convert to a registered abstraction."""
 
-        if not force and name in self._abstractions:
-            return self._abstractions[name]
-
-        if name not in ABSTRACTION_REGISTRY:
-            raise ValueError(f"Unknown abstraction: {name}")
-
-        cls = ABSTRACTION_REGISTRY[name]
-
-        abstraction = cls(self)
-
-        self._abstractions[name] = abstraction
-
-        return abstraction
-
-    def __getattr__(self, name):
-
-        if name in ABSTRACTION_REGISTRY:
-
-            def wrapper(force=False):
-                return self.to_abstraction(name, force=force)
-
-            return wrapper
-
-        raise AttributeError(
-            f"{self.__class__.__name__} has no attribute '{name}'"
-        )
 
     # ======================================================================= #
     # Dunder methods
