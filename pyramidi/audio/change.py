@@ -40,10 +40,16 @@ Use Abstract Class `ChangeAudio` to create new changes.
 # =========================================================================== #
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
-from subprocess import run, DEVNULL
+from subprocess import run, DEVNULL, PIPE
 from os import remove
-from os.path import exists
+from os.path import exists, join
 from shutil import which
+import re
+import tempfile
+from pathlib import Path
+
+import numpy as np
+from soundfile import read, write
 
 from .synthesize import prepare_tempfile
 
@@ -135,68 +141,84 @@ def change_audio(change_vector: List[ChangeAudio], audio_file: str, output_path:
 
 # =========================================================================== #
 class ApplyReverb(ChangeAudio):
-    """Apply convolution reverb to an audio file using an impulse response."""
+    """Apply convolution reverb using afir + exact peak normalization (-1 dBFS)."""
 
-    def __init__(self, ir: str, dry: float = 1, wet: float = 10):
-        """
-        Arguments:
-        ir (str) -- Path to an IR .wav file.
-        dry (float) -- Weight for original (dry) input audio.
-        wet (float) -- Weight for audio convolved with impulse response.
-        """
+    def __init__(self, ir: str, target_peak: float = -1):
         if not exists(ir):
             raise FileNotFoundError(f"Impulse Response not found: {ir}")
-
         if not ir.lower().endswith(".wav"):
             raise ValueError("ir must be a .wav file")
-
-        if not isinstance(dry, (int, float)):
-            raise TypeError("dry must be numeric.")
-        if not isinstance(wet, (int, float)):
-            raise TypeError("wet must be numeric.")
+        if not -60 < target_peak < 0:
+            raise ValueError("target_peak must be greater than -60 and less than 0.")
 
         self.ir = ir
-        self.dry = dry
-        self.wet = wet
+        self.target_peak = target_peak
+
+    def _detect_peak(self, audio_file: str) -> float:
+        """Replicates: afir,volumedetect"""
+        command = [
+            "ffmpeg",
+            "-i", audio_file,
+            "-i", self.ir,
+            "-lavfi", "afir,volumedetect",
+            "-f", "null",
+            "-"
+        ]
+
+        result = run(command, stdout=DEVNULL, stderr=PIPE, text=True, check=True)
+
+        match = re.search(r"max_volume:\s*(-?\d+(\.\d+)?)\s*dB", result.stderr)
+        if not match:
+            raise RuntimeError("Could not parse max_volume from ffmpeg output")
+
+        return float(match.group(1))
 
     def change(self, audio_file: str, output_path: str | None = None, silent: bool = True) -> str:
         _check_ffmpeg()
+
+        output_path = prepare_tempfile(output_path, self.output_suffix)
+
+        # ------------------------------------------------------------------ #
+        # Pass 1: measure peak after convolution
+        peak = self._detect_peak(audio_file)
+        gain = self.target_peak - peak
+
+        if not silent:
+            print(f"Detected peak: {peak}")
+            print(f"Applying gain: {gain} dB")
 
         kwargs = {}
         if silent:
             kwargs["stdout"] = DEVNULL
             kwargs["stderr"] = DEVNULL
 
-        output_path = prepare_tempfile(output_path, self.output_suffix)
-
-        filter_complex = (
-            "[0:a]asplit=2[dry][in];"
-            "[in][1:a]afir[wet];"
-            f"[dry][wet]amix=inputs=2:weights={self.dry} {self.wet}:normalize=0"
-        )
-
+        # ------------------------------------------------------------------ #
+        # Pass 2: apply convolution again + gain
         command = [
             "ffmpeg", "-y",
             "-i", audio_file,
             "-i", self.ir,
-            "-filter_complex", filter_complex,
-            output_path
+            "-lavfi", f"afir,volume={gain}dB",
+            output_path,
         ]
+
+        if not silent:
+            print(" ".join(command))
 
         run(command, check=True, **kwargs)
         return output_path
 
-    def to_spec(self):
+    def to_spec(self) -> dict:
         return {
             "type": self.__class__.__name__,
             "ir": self.ir,
-            "dry": self.dry,
-            "wet": self.wet,
+            "target_db": self.target_peak,
         }
 
     def label(self) -> str:
-        from pathlib import Path
-        return f"verb({Path(self.ir).stem})_wet{self.wet}"
+        s = str(self.target_peak)
+        val = s.replace('-', 'm').replace('.', 'p')
+        return f"verb({Path(self.ir).stem})_peak{val}"
 
 # =========================================================================== #
 class ApplyCompression(ChangeAudio):
@@ -332,5 +354,83 @@ class NormalizeLoudness(ChangeAudio):
 
     def label(self) -> str:
         return f"lufs{self.target_lufs}"
+
+# =========================================================================== #
+# NOTE: BAD!!!! NOISE!!!!
+class NormalizePeak(ChangeAudio):
+    """Normalize audio to a target peak level using a two-pass FFmpeg workflow."""
+
+    def __init__(self, target_db: float = -1.0):
+        """
+        Arguments:
+        target_db (float) -- Target peak level in dBFS (default: -1.0).
+        """
+        if not isinstance(target_db, (int, float)):
+            raise ValueError("target_db must be a number")
+
+        self.target_db = float(target_db)
+
+    def _detect_peak(self, audio_file: str) -> float:
+        """Return max_volume (dBFS) using FFmpeg volumedetect."""
+        command = [
+            "ffmpeg",
+            "-i", audio_file,
+            "-af", "volumedetect",
+            "-f", "null",
+            "-"
+        ]
+
+        result = run(command, stdout=DEVNULL, stderr=PIPE, text=True, check=True)
+
+        match = re.search(r"max_volume:\s*(-?\d+(\.\d+)?)\s*dB", result.stderr)
+        if not match:
+            raise RuntimeError("Could not parse max_volume from ffmpeg output")
+
+        return float(match.group(1))
+
+    def change(self, audio_file: str, output_path: str | None = None, silent: bool = True) -> str:
+        _check_ffmpeg()
+
+        output_path = prepare_tempfile(output_path, self.output_suffix)
+
+        kwargs = {}
+        if silent:
+            kwargs["stdout"] = DEVNULL
+            kwargs["stderr"] = DEVNULL
+
+        # ------------------------------------------------------------------ #
+        # Pass 1: measure peak
+        peak = self._detect_peak(audio_file)
+
+        # Compute gain
+        gain = self.target_db - peak
+
+        if not silent:
+            print(f"Detected peak: {peak} dB")
+            print(f"Applying gain: {gain} dB")
+
+        # ------------------------------------------------------------------ #
+        # Pass 2: apply gain
+        command = [
+            "ffmpeg", "-y",
+            "-i", audio_file,
+            "-af", f"volume={gain}dB",
+            output_path,
+        ]
+
+        if not silent:
+            print(" ".join(command))
+
+        run(command, check=True, **kwargs)
+        return output_path
+
+    def to_spec(self) -> dict:
+        return {
+            "type": self.__class__.__name__,
+            "target_db": self.target_db,
+        }
+
+    def label(self) -> str:
+        return f"norm_peak{self.target_db}dB"
 
 # =========================================================================== #
